@@ -1,0 +1,25 @@
+
+> figma-make-app@1.0.0 dev
+> vite --host 0.0.0.0 --host 127.0.0.1 --port 5173
+
+
+  [32m[1mVITE[22m v8.1.5[39m  [2mready in [0m[1m8986[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/encadrini-ai/[39m
+[2m14:03:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/student/ReportVersionDetail.tsx, /src/pages/auth/LoginPage.tsx, /src/pages/student/StudentDashboard.tsx, /src/index.css[22m
+[2m14:03:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/student/ReportVersionDetail.tsx, /src/pages/auth/LoginPage.tsx, /src/pages/student/StudentDashboard.tsx, /src/index.css[22m
+[2m14:04:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/index.css[22m
+[2m14:04:11[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/auth/SignupPage.tsx, /src/index.css[22m
+[2m14:04:42[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/auth/SignupPage.tsx, /src/index.css[22m
+[2m14:04:51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/student/StudentDashboard.tsx, /src/index.css[22m
+[2m14:10:08[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/index.css[22m
+[2m14:10:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/auth/SignupPage.tsx, /src/index.css[22m
+[2m14:26:23[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/student/ReportVersionDetail.tsx, /src/pages/auth/LoginPage.tsx, /src/pages/student/StudentDashboard.tsx, /src/pages/auth/SignupPage.tsx, /src/index.css[22m
+[2m14:26:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/auth/SignupPage.tsx, /src/index.css[22m
+[2m14:26:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/auth/LoginPage.tsx, /src/index.css[22m
+[2m14:27:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/index.css[22m
+[2m14:30:56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/student/ReportVersionDetail.tsx, /src/pages/auth/LoginPage.tsx, /src/pages/student/StudentDashboard.tsx, /src/pages/auth/SignupPage.tsx, /src/pages/auth/EmailConfirmationPage.tsx, /src/index.css[22m
+[2m14:31:12[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/auth/SignupPage.tsx, /src/index.css[22m
+[2m14:34:28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/auth/SignupPage.tsx, /src/index.css[22m
+[2m14:46:40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/components/layout/PublicNavbar.tsx[22m
+[2m14:46:40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/PublicNavbar.tsx[22m

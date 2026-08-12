@@ -15,7 +15,13 @@ class User(Document):
     role: UserRole = UserRole.STUDENT
     first_name: str
     last_name: str
-    is_active: bool = True
+    faculty: str = ""
+    gender: str = ""
+    phone_number: str = ""
+    is_active: bool = False
+    email_confirm_token_hash: Optional[str] = None
+    email_confirm_expires_at: Optional[datetime] = None
+    email_confirmed_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:

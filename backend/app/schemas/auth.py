@@ -7,6 +7,9 @@ class UserRegister(BaseModel):
     password: str
     first_name: str
     last_name: str
+    faculty: str
+    gender: str
+    phone_number: str
     role: UserRole = UserRole.STUDENT
 
 class UserLogin(BaseModel):
@@ -18,6 +21,9 @@ class UserResponse(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
+    faculty: str
+    gender: str
+    phone_number: str
     role: UserRole
     is_active: bool
 
@@ -26,3 +32,6 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+class MessageResponse(BaseModel):
+    message: str

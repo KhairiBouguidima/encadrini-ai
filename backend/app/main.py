@@ -32,6 +32,16 @@ app.include_router(reports.router, prefix=f"{settings.API_V1_STR}/reports", tags
 app.include_router(annotations.router, prefix=f"{settings.API_V1_STR}/annotations", tags=["annotations"])
 app.include_router(ai.router, prefix=f"{settings.API_V1_STR}/ai", tags=["ai"])
 
+@app.get("/")
+async def root():
+    return {
+        "status": "ok",
+        "project": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "docs": "/docs",
+        "api": settings.API_V1_STR,
+    }
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "project": settings.PROJECT_NAME, "version": settings.VERSION}

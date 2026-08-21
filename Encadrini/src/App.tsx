@@ -62,7 +62,8 @@ export default function App() {
   const [emailConfirmationToken, setEmailConfirmationToken] = useState(() => {
     return new URLSearchParams(window.location.search).get("confirm_email") ?? ""
   })
-  const [selectedVersion, setSelectedVersion] = useState("3")
+  const [selectedVersion, setSelectedVersion] = useState("1")
+  const [selectedReport, setSelectedReport] = useState("")
   const [route, setRoute] = useState<Route>(() => {
     if (new URLSearchParams(window.location.search).get("confirm_email")) return "email-confirmation"
     const storedUser = getStoredUser()
@@ -109,11 +110,16 @@ export default function App() {
       )}
       {route === "student-dashboard" && (
         <StudentDashboard
-          onOpenVersion={(versionId) => {
+          onOpenVersion={(reportId, versionId) => {
+            setSelectedReport(reportId)
             setSelectedVersion(versionId)
             setRoute("student-version")
           }}
-          onOpenWorkshop={() => setRoute("ai-workshop")}
+          onOpenWorkshop={(reportId, versionId) => {
+            setSelectedReport(reportId)
+            setSelectedVersion(versionId)
+            setRoute("ai-workshop")
+          }}
           onExit={handleExit}
           user={user}
         />
@@ -130,7 +136,13 @@ export default function App() {
       {route === "supervisor-reviewer" && (
         <ReportReviewer onExit={handleExit} user={user} />
       )}
-      {route === "ai-workshop" && <AIWorkshop onExit={handleExit} />}
+      {route === "ai-workshop" && (
+        <AIWorkshop 
+          onExit={handleExit} 
+          reportId={selectedReport} 
+          versionNumber={Number(selectedVersion)} 
+        />
+      )}
       {route === "admin-dashboard" && (
         <AdminDashboard onExit={handleExit} />
       )}

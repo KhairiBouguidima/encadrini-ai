@@ -16,6 +16,13 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class UserUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    faculty: Optional[str] = None
+    phone_number: Optional[str] = None
+    openai_api_key: Optional[str] = None
+
 class UserResponse(BaseModel):
     id: str
     email: EmailStr
@@ -26,6 +33,7 @@ class UserResponse(BaseModel):
     phone_number: str
     role: UserRole
     is_active: bool
+    openai_api_key: Optional[str] = None
 
 class TokenResponse(BaseModel):
     access_token: str

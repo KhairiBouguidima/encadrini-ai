@@ -22,6 +22,7 @@ class User(Document):
     email_confirm_token_hash: Optional[str] = None
     email_confirm_expires_at: Optional[datetime] = None
     email_confirmed_at: Optional[datetime] = None
+    openai_api_key: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:

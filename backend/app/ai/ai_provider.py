@@ -6,12 +6,12 @@ from app.core.config import settings
 
 class BaseAIProvider(ABC):
     @abstractmethod
-    async def analyze_report(self, text_content: str) -> Dict[str, Any]:
+    async def analyze_report(self, text_content: str, user_api_key: str = None) -> Dict[str, Any]:
         """Performs multi-dimensional analysis and returns structured JSON output."""
         pass
 
 class OpenAIProvider(BaseAIProvider):
-    async def analyze_report(self, text_content: str) -> Dict[str, Any]:
+    async def analyze_report(self, text_content: str, user_api_key: str = None) -> Dict[str, Any]:
         # Truncate text sample for dev safety if needed
         doc_sample = text_content[:10000]
         
@@ -52,13 +52,14 @@ Return ONLY a valid JSON object matching this exact schema:
 }}
 """
         try:
+            api_key = user_api_key or settings.OPENAI_API_KEY
             # Fallback mock structured response for development environment when API key is unconfigured
-            if settings.OPENAI_API_KEY == "sk-fake-key-for-dev":
+            if not api_key or api_key == "sk-fake-key-for-dev":
                 return self._generate_mock_analysis()
                 
             response = requests.post(
                 "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
+                headers={"Authorization": f"Bearer {api_key}"},
                 json={
                     "model": "gpt-3.5-turbo-1106",
                     "response_format": {"type": "json_object"},

@@ -8,6 +8,8 @@ from app.models.report import Report
 from app.models.annotation import Annotation
 from app.schemas.annotation import AnnotationCreate, AnnotationResponse
 from app.api.deps import get_current_user, require_role
+from app.models.notification import NotificationType
+from app.services.notification_service import notify
 
 router = APIRouter()
 
@@ -36,6 +38,16 @@ async def create_annotation(
         content=annotation_in.content
     )
     await annotation.insert()
+
+    # Notify student
+    if project.student_id:
+        await notify(
+            user_id=project.student_id,
+            notification_type=NotificationType.ANNOTATION_ADDED,
+            title="New Annotation",
+            message=f"{current_user.first_name} {current_user.last_name} commented on page {annotation.page_number}.",
+            link=f"/reports/{report.id}/v{annotation.version_number}?page={annotation.page_number}"
+        )
 
     return AnnotationResponse(
         id=str(annotation.id),

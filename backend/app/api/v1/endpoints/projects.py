@@ -9,6 +9,8 @@ from app.models.user import User, UserRole
 from app.models.project import Project, Invitation, InvitationStatus, ProjectStatus
 from app.schemas.project import ProjectCreate, ProjectResponse, InviteEncadrerRequest, InvitationResponse
 from app.api.deps import get_current_user, require_role
+from app.models.notification import NotificationType
+from app.services.notification_service import notify
 
 router = APIRouter()
 
@@ -122,6 +124,15 @@ async def accept_invitation(
     
     invitation.status = InvitationStatus.ACCEPTED
     await invitation.save()
+    
+    # Notify the student
+    await notify(
+        user_id=project.student_id,
+        notification_type=NotificationType.INVITATION_ACCEPTED,
+        title="Supervisor Accepted",
+        message=f"{current_user.first_name} {current_user.last_name} has accepted to supervise your project.",
+        link=f"/projects/me"
+    )
     
     return ProjectResponse(
         id=str(project.id),

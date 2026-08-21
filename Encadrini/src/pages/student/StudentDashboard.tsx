@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { AppShell, type NavItem } from "../../components/layout/AppShell"
-import { Card, Avatar } from "../../components/ui/Primitives"
+import { Card, Avatar, Input } from "../../components/ui/Primitives"
 import { Button } from "../../components/ui/Button"
 import { StatusBadge, type BadgeVariant } from "../../components/ui/Badge"
 import { IconReport, IconSparkles, IconUpload, IconBell, IconChevronRight } from "../../components/ui/Icons"
@@ -58,8 +58,8 @@ export function StudentDashboard({
   onExit,
   user,
 }: {
-  onOpenVersion: (versionId: string) => void
-  onOpenWorkshop: () => void
+  onOpenVersion: (reportId: string, versionId: string) => void
+  onOpenWorkshop: (reportId: string, versionId: string) => void
   onExit: () => void
   user?: User | null
 }) {
@@ -69,6 +69,9 @@ export function StudentDashboard({
   const [notice, setNotice] = useState("Mode demo: connectez-vous au backend pour charger vos donnees.")
   const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isCreatingProject, setIsCreatingProject] = useState(false)
+  const [newProjectTitle, setNewProjectTitle] = useState("")
+  const [newProjectDesc, setNewProjectDesc] = useState("")
 
   const userName = user ? `${user.first_name} ${user.last_name}` : "Karim Boumediene"
   const versions = useMemo(
@@ -128,23 +131,67 @@ export function StudentDashboard({
     <AppShell
       navItems={navItems}
       activeKey="dashboard"
-      onNavigate={(key) => key === "workshop" && onOpenWorkshop()}
+      onNavigate={(key) => key === "workshop" && history && onOpenWorkshop(history.id, String(versions[0]?.version_number || 1))}
       onExit={onExit}
       userName={userName}
       userRole="Etudiant - M2 informatique"
     >
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-start justify-between mb-8 gap-6">
-          <div>
-            <h1 className="text-2xl font-bold font-display text-neutral-900">
-              {project?.title ?? "Detection d'anomalies reseau par apprentissage automatique"}
-            </h1>
-            <p className="text-sm text-neutral-500 font-body mt-1">
-              {project?.description || "Projet PFE - Genie informatique"}
-            </p>
+        {!project ? (
+          <Card className="mb-8">
+            <h2 className="font-semibold font-display text-neutral-800 mb-4">Créer votre projet PFE</h2>
+            <p className="text-sm text-neutral-500 mb-4">Vous devez créer un projet avant de pouvoir déposer des rapports.</p>
+            <div className="space-y-4">
+              <Input
+                label="Titre du projet"
+                value={newProjectTitle}
+                onChange={(e) => setNewProjectTitle(e.target.value)}
+                placeholder="Ex: Détection d'anomalies..."
+              />
+              <Input
+                label="Description"
+                value={newProjectDesc}
+                onChange={(e) => setNewProjectDesc(e.target.value)}
+                placeholder="Description courte de votre projet"
+              />
+              <Button
+                disabled={isCreatingProject || !newProjectTitle}
+                onClick={async () => {
+                  setIsCreatingProject(true)
+                  try {
+                    const p = await api.createProject(newProjectTitle, newProjectDesc)
+                    setProject(p)
+                    setNotice("Projet créé avec succès. Vous pouvez maintenant déposer vos rapports.")
+                  } catch (err) {
+                    setNotice(err instanceof Error ? err.message : "Erreur lors de la création du projet")
+                  } finally {
+                    setIsCreatingProject(false)
+                  }
+                }}
+              >
+                {isCreatingProject ? "Création..." : "Créer mon projet"}
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <div className="flex items-start justify-between mb-8 gap-6">
+            <div>
+              <h1 className="text-2xl font-bold font-display text-neutral-900">
+                {project.title}
+              </h1>
+              <p className="text-sm text-neutral-500 font-body mt-1">
+                {project.description}
+              </p>
+            </div>
+            {project.encadrer_id ? (
+               <Avatar name="Encadreur Assigné" role="Encadreur" size="md" />
+            ) : (
+               <div className="text-sm text-neutral-400 border border-neutral-200 px-3 py-1 rounded-md">
+                 Pas d'encadreur assigné
+               </div>
+            )}
           </div>
-          <Avatar name="Pr. Said Amrani" role="Encadreur associe" size="md" />
-        </div>
+        )}
 
         <Card className="mb-8">
           <h2 className="font-semibold font-display text-neutral-800 mb-4">Deposer une nouvelle version</h2>
@@ -186,7 +233,7 @@ export function StudentDashboard({
             {versions.map((version) => (
               <button
                 key={version.version_number}
-                onClick={() => onOpenVersion(String(version.version_number))}
+                onClick={() => history && onOpenVersion(history.id, String(version.version_number))}
                 className="w-full flex items-center justify-between px-5 py-4 hover:bg-neutral-50 transition-colors text-left"
               >
                 <div className="flex items-center gap-4">
@@ -212,7 +259,12 @@ export function StudentDashboard({
         </Card>
 
         <div className="flex justify-end mt-6">
-          <Button variant="ai" icon={<IconSparkles size={16} />} onClick={onOpenWorkshop}>
+          <Button 
+            variant="ai" 
+            icon={<IconSparkles size={16} />} 
+            onClick={() => history && onOpenWorkshop(history.id, String(versions[0]?.version_number || 1))}
+            disabled={!history || versions.length === 0}
+          >
             Ouvrir l'Atelier IA
           </Button>
         </div>

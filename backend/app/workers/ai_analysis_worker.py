@@ -6,6 +6,9 @@ from app.models.report import Report, AIAnalysisStatus
 from app.models.ai_analysis import AIAnalysis, AnalysisScores, CorrectionIssue, GeneratedContent
 from app.storage.storage_service import get_storage_service
 from app.ai.ai_provider import get_ai_provider
+from app.models.notification import Notification, NotificationType
+from app.models.project import Project
+from app.services.notification_service import notify
 
 
 async def run_ai_analysis(report_id: str, version_number: int):
@@ -17,7 +20,7 @@ async def run_ai_analysis(report_id: str, version_number: int):
     client = AsyncIOMotorClient(settings.MONGODB_URL)
     await init_beanie(
         database=client[settings.MONGODB_DB_NAME],
-        document_models=[Report, AIAnalysis]
+        document_models=[Report, AIAnalysis, Notification, Project]
     )
 
     report = await Report.get(report_id)
@@ -80,10 +83,36 @@ async def run_ai_analysis(report_id: str, version_number: int):
         version.ai_analysis_status = AIAnalysisStatus.COMPLETED
         await report.save()
 
+        # Notify project stakeholders
+        project = await Project.get(report.project_id)
+        if project:
+            for uid in [project.student_id, project.encadrer_id]:
+                if uid:
+                    await notify(
+                        user_id=uid,
+                        notification_type=NotificationType.AI_ANALYSIS_COMPLETED,
+                        title="AI Analysis Complete",
+                        message=f"AI analysis for report v{version_number} is ready. Overall quality: {scores.overall_quality}/100",
+                        link=f"/reports/{report_id}/v{version_number}/analysis",
+                    )
+
     except Exception as e:
         print(f"AI analysis failed for report {report_id} v{version_number}: {e}")
         version.ai_analysis_status = AIAnalysisStatus.FAILED
         await report.save()
+
+        # Notify project stakeholders of failure
+        project = await Project.get(report.project_id)
+        if project:
+            for uid in [project.student_id, project.encadrer_id]:
+                if uid:
+                    await notify(
+                        user_id=uid,
+                        notification_type=NotificationType.AI_ANALYSIS_FAILED,
+                        title="AI Analysis Failed",
+                        message=f"AI analysis for report v{version_number} encountered an error. Please retry.",
+                        link=f"/reports/{report_id}/v{version_number}",
+                    )
 
 
 def _extract_text(file_bytes: bytes, mime_type: str) -> str:

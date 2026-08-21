@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token
 from app.core.email import send_email_confirmation
 from app.models.user import User
-from app.schemas.auth import UserRegister, UserLogin, TokenResponse, UserResponse, MessageResponse
+from app.schemas.auth import UserRegister, UserLogin, TokenResponse, UserResponse, MessageResponse, UserUpdate
 from app.api.deps import get_current_user
 
 router = APIRouter()
@@ -53,7 +53,8 @@ async def register(user_in: UserRegister, background_tasks: BackgroundTasks):
         gender=user.gender,
         phone_number=user.phone_number,
         role=user.role,
-        is_active=user.is_active
+        is_active=user.is_active,
+        openai_api_key=user.openai_api_key
     )
 
 @router.post("/login", response_model=TokenResponse)
@@ -86,7 +87,8 @@ async def login(credentials: UserLogin):
             gender=user.gender,
             phone_number=user.phone_number,
             role=user.role,
-            is_active=user.is_active
+            is_active=user.is_active,
+            openai_api_key=user.openai_api_key
         )
     )
 
@@ -124,5 +126,31 @@ async def get_me(current_user: User = Depends(get_current_user)):
         gender=current_user.gender,
         phone_number=current_user.phone_number,
         role=current_user.role,
-        is_active=current_user.is_active
+        is_active=current_user.is_active,
+        openai_api_key=current_user.openai_api_key
+    )
+
+@router.put("/me", response_model=UserResponse)
+async def update_me(
+    update_data: UserUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    update_dict = update_data.model_dump(exclude_unset=True)
+    
+    for key, value in update_dict.items():
+        setattr(current_user, key, value)
+        
+    await current_user.save()
+    
+    return UserResponse(
+        id=str(current_user.id),
+        email=current_user.email,
+        first_name=current_user.first_name,
+        last_name=current_user.last_name,
+        faculty=current_user.faculty,
+        gender=current_user.gender,
+        phone_number=current_user.phone_number,
+        role=current_user.role,
+        is_active=current_user.is_active,
+        openai_api_key=current_user.openai_api_key
     )

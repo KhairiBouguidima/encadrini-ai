@@ -21,6 +21,7 @@ export function SignupPage({
   const [faculty, setFaculty] = useState("")
   const [gender, setGender] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
+  const [role, setRole] = useState<"STUDENT" | "ENCADRER">("STUDENT")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -44,6 +45,7 @@ export function SignupPage({
         faculty,
         gender,
         phone_number: phoneNumber,
+        role,
       })
 
       sessionStorage.setItem(
@@ -112,8 +114,24 @@ export function SignupPage({
                   <option value="other">Autre</option>
                 </select>
               </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-neutral-700 font-body mb-1.5">
+                  Rôle
+                </span>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as "STUDENT" | "ENCADRER")}
+                  required
+                  className="w-full rounded-lg border border-neutral-300 px-3.5 py-2.5 text-sm font-body text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-500 transition"
+                >
+                  <option value="STUDENT">Étudiant</option>
+                  <option value="ENCADRER">Encadreur</option>
+                </select>
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
-                label="Telephone"
+                label="Téléphone"
                 type="tel"
                 placeholder="+216 12 345 678"
                 value={phoneNumber}

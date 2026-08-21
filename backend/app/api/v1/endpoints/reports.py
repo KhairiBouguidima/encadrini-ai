@@ -10,6 +10,8 @@ from app.api.deps import get_current_user, require_role
 from app.storage.storage_service import get_storage_service
 from app.workers.conversion_worker import convert_docx_to_pdf_task
 from app.workers.ai_analysis_worker import run_ai_analysis
+from app.models.notification import NotificationType
+from app.services.notification_service import notify
 
 router = APIRouter()
 
@@ -69,6 +71,16 @@ async def upload_report_version(
 
     # Trigger async AI analysis in background
     background_tasks.add_task(run_ai_analysis, str(report.id), next_version)
+
+    # Notify the encadrer
+    if project.encadrer_id:
+        await notify(
+            user_id=project.encadrer_id,
+            notification_type=NotificationType.REPORT_UPLOADED,
+            title="New Report Version",
+            message=f"{current_user.first_name} {current_user.last_name} uploaded version {next_version}.",
+            link=f"/reports/{report.id}/v{next_version}"
+        )
 
     return ReportResponse(
         id=str(report.id),

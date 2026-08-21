@@ -58,6 +58,31 @@ export interface Annotation {
   created_at: string
 }
 
+export interface AIAnalysisResponse {
+  status: AIAnalysisStatus
+  report_id: string
+  version_number: number
+  scores: {
+    linguistic: number
+    structural: number
+    coherence: number
+    overall_quality: number
+  } | null
+  missing_sections: string[]
+  corrections: {
+    page: number | null
+    original: string
+    suggestion: string
+    explanation: string
+  }[]
+  generated_content: {
+    summary: string
+    abstract: string
+    keywords: string[]
+    jury_questions: string[]
+  } | null
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
 const ACCESS_TOKEN_KEY = "encadrini_access_token"
 const REFRESH_TOKEN_KEY = "encadrini_refresh_token"
@@ -147,6 +172,12 @@ export const api = {
   getMyProject() {
     return request<Project>("/projects/me")
   },
+  createProject(title: string, description: string) {
+    return request<Project>("/projects/", {
+      method: "POST",
+      body: JSON.stringify({ title, description }),
+    })
+  },
   getReportHistory() {
     return request<ReportHistory>("/reports/history")
   },
@@ -163,6 +194,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ version_number: versionNumber, page_number: pageNumber, content }),
     })
+  },
+  getAIAnalysis(reportId: string, versionNumber: number) {
+    return request<AIAnalysisResponse>(`/ai/reports/${reportId}/version/${versionNumber}`)
   },
   getDownloadUrl(versionNumber: number) {
     return `${API_BASE_URL}/reports/download/${versionNumber}`

@@ -53,13 +53,21 @@ export function AppShell({
           ))}
         </nav>
         <div className="px-3 py-4 border-t border-neutral-200">
-          <Avatar name={userName} role={userRole} size="sm" />
+          <button
+            onClick={() => onNavigate("profile")}
+            className="w-full text-left rounded-lg p-2 hover:bg-neutral-100 transition-colors duration-150 cursor-pointer"
+          >
+            <Avatar name={userName} role={userRole} size="sm" />
+          </button>
         </div>
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="h-16 flex-shrink-0 bg-white border-b border-neutral-200 flex items-center justify-end gap-4 px-6">
-          <button className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 hover:bg-neutral-100 transition-colors relative">
+          <button
+            onClick={() => onNavigate("notifications")}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 hover:bg-neutral-100 transition-colors relative cursor-pointer"
+          >
             <IconBell size={18} />
             <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-danger-600" />
           </button>

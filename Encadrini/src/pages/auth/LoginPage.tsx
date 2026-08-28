@@ -75,8 +75,12 @@ export function LoginPage({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-sm font-medium text-neutral-700 font-body">Mot de passe</span>
-                <button type="button" className="text-xs text-primary-600 font-body hover:underline">
-                  Mot de passe oublie ?
+                <button 
+                  type="button" 
+                  onClick={() => onNavigate("forgot-password" as any)}
+                  className="text-xs text-primary-600 font-body hover:underline"
+                >
+                  Mot de passe oublié ?
                 </button>
               </div>
               <Input

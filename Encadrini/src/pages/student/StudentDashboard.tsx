@@ -9,7 +9,6 @@ import { api, type Project, type ReportHistory, type ReportVersion, type User } 
 const navItems: NavItem[] = [
   { key: "dashboard", label: "Tableau de bord", icon: <IconReport size={18} /> },
   { key: "workshop", label: "Atelier IA", icon: <IconSparkles size={18} /> },
-  { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
 ]
 
 const sampleVersions: ReportVersion[] = [
@@ -75,8 +74,8 @@ export function StudentDashboard({
 
   const userName = user ? `${user.first_name} ${user.last_name}` : "Karim Boumediene"
   const versions = useMemo(
-    () => [...(history?.versions ?? sampleVersions)].sort((a, b) => b.version_number - a.version_number),
-    [history],
+    () => [...(history?.versions ?? (user ? [] : sampleVersions))].sort((a, b) => b.version_number - a.version_number),
+    [history, user],
   )
 
   useEffect(() => {
@@ -230,6 +229,11 @@ export function StudentDashboard({
             </h2>
           </div>
           <div className="divide-y divide-neutral-100">
+            {versions.length === 0 && (
+              <p className="px-5 py-4 text-sm text-neutral-500 font-body">
+                Aucune version deposee pour le moment.
+              </p>
+            )}
             {versions.map((version) => (
               <button
                 key={version.version_number}

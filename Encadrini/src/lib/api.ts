@@ -10,6 +10,7 @@ export interface User {
   phone_number: string
   role: UserRole
   is_active: boolean
+  openai_api_key?: string
 }
 
 export interface TokenResponse {
@@ -83,16 +84,66 @@ export interface AIAnalysisResponse {
   } | null
 }
 
+export interface AdminUser {
+  id: string
+  email: string
+  role: UserRole
+  first_name: string
+  last_name: string
+  faculty: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface AdminUserListResponse {
+  users: AdminUser[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface AdminProject {
+  id: string
+  title: string
+  student_email: string | null
+  encadrer_email: string | null
+  report_count: number
+  latest_version: number | null
+  created_at: string
+}
+
+export interface AdminProjectListResponse {
+  projects: AdminProject[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface PlatformStats {
+  total_users: number
+  total_students: number
+  total_encadrers: number
+  total_admins: number
+  active_users: number
+  total_projects: number
+  total_reports: number
+  total_report_versions: number
+  total_annotations: number
+  total_ai_analyses: number
+  ai_analysis_avg_quality: number | null
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
 const ACCESS_TOKEN_KEY = "encadrini_access_token"
 const REFRESH_TOKEN_KEY = "encadrini_refresh_token"
 const USER_KEY = "encadrini_user"
+export const SESSION_EXPIRED_EVENT = "encadrini_session_expired"
 
-function getAccessToken() {
+export function getAccessToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY)
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const headers = new Headers(options.headers)
   const token = getAccessToken()
 
@@ -103,12 +154,32 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
   if (!response.ok) {
+    if (response.status === 401 && token && !isRetry && path !== "/auth/refresh") {
+      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
+      if (refreshToken) {
+        try {
+          const payload = await api.refreshToken(refreshToken)
+          saveSession(payload)
+          // Retry the original request
+          return request<T>(path, options, true)
+        } catch (err) {
+          clearSession()
+          window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+          throw new Error("Session expirée. Veuillez vous reconnecter.")
+        }
+      }
+    }
+
     let message = "Erreur de communication avec le serveur."
     try {
       const payload = await response.json()
       message = payload.detail ?? message
     } catch {
       message = response.statusText || message
+    }
+    if (response.status === 401 && token) {
+      clearSession()
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
     }
     throw new Error(message)
   }
@@ -169,6 +240,32 @@ export const api = {
   me() {
     return request<User>("/auth/me")
   },
+  refreshToken(refresh_token: string) {
+    // using raw fetch to avoid interceptor loop, but we added path bypass in interceptor so it's fine.
+    // However, it's a POST and doesn't need Bearer token since it sends refresh token in body.
+    return request<TokenResponse>("/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token })
+    })
+  },
+  forgotPassword(email: string) {
+    return request<{ message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    })
+  },
+  resetPassword(token: string, new_password: string) {
+    return request<{ message: string }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, new_password })
+    })
+  },
+  changePassword(current_password: string, new_password: string) {
+    return request<{ message: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ current_password, new_password })
+    })
+  },
   getMyProject() {
     return request<Project>("/projects/me")
   },
@@ -198,11 +295,52 @@ export const api = {
   getAIAnalysis(reportId: string, versionNumber: number) {
     return request<AIAnalysisResponse>(`/ai/reports/${reportId}/version/${versionNumber}`)
   },
+  getAdminStats() {
+    return request<PlatformStats>("/admin/stats")
+  },
+  getAdminUsers(search = "") {
+    const query = search ? `?search=${encodeURIComponent(search)}` : ""
+    return request<AdminUserListResponse>(`/admin/users${query}`)
+  },
+  getAdminProjects(search = "") {
+    const query = search ? `?search=${encodeURIComponent(search)}` : ""
+    return request<AdminProjectListResponse>(`/admin/projects${query}`)
+  },
+  updateAdminUser(userId: string, payload: Partial<Pick<AdminUser, "is_active" | "role" | "faculty">>) {
+    return request<AdminUser>(`/admin/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    })
+  },
+  updateMe(payload: { first_name?: string; last_name?: string; faculty?: string; phone_number?: string; openai_api_key?: string }) {
+    return request<User>("/auth/me", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    })
+  },
+  inviteSupervisor(encadrer_email: string) {
+    return request<{ id: string; invitation_link: string }>("/projects/invite", {
+      method: "POST",
+      body: JSON.stringify({ encadrer_email }),
+    })
+  },
   getDownloadUrl(versionNumber: number) {
     return `${API_BASE_URL}/reports/download/${versionNumber}`
   },
-  getAuthHeaders() {
+  getAuthHeaders(): Record<string, string> {
     const token = getAccessToken()
     return token ? { Authorization: `Bearer ${token}` } : {}
+  },
+  chatWithAgent(report_id: string, version_number: number, messages: { role: string; content: string }[]) {
+    return request<{ reply: string }>("/ai/chat", {
+      method: "POST",
+      body: JSON.stringify({ report_id, version_number, messages }),
+    })
+  },
+  checkAIContent(text: string) {
+    return request<{ ai_score: number; label: string; rewritten: string | null }>("/ai/check-ai", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    })
   },
 }

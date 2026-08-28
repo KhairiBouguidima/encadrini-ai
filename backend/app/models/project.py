@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from beanie import Document, Link, PydanticObjectId, Indexed
 from pydantic import Field, EmailStr
 from app.models.user import User
@@ -12,6 +12,7 @@ class ProjectStatus(str, Enum):
 class Project(Document):
     student_id: Indexed(PydanticObjectId)
     encadrer_id: Optional[PydanticObjectId] = None
+    encadrer_ids: List[PydanticObjectId] = Field(default_factory=list)
     title: str
     description: str
     status: ProjectStatus = ProjectStatus.ACTIVE

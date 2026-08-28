@@ -116,28 +116,40 @@ async def run_ai_analysis(report_id: str, version_number: int):
 
 
 def _extract_text(file_bytes: bytes, mime_type: str) -> str:
-    """Simple text extraction — PDF via raw decode, DOCX via python-docx."""
-    if "pdf" in mime_type:
-        # Try pdfplumber if available, else fallback to raw decode
-        try:
-            import pdfplumber
-            import io
-            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-                return "\n\n".join(
-                    page.extract_text() or "" for page in pdf.pages
-                )
-        except ImportError:
-            return file_bytes.decode("utf-8", errors="ignore")
-    elif "word" in mime_type or "docx" in mime_type:
-        try:
-            import docx
-            import io
-            doc = docx.Document(io.BytesIO(file_bytes))
-            return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-        except ImportError:
-            return file_bytes.decode("utf-8", errors="ignore")
-    else:
-        return file_bytes.decode("utf-8", errors="ignore")
+    """Robust text extraction from PDF or DOCX binary bytes."""
+    # 1. Try DOCX (python-docx)
+    try:
+        import docx
+        import io
+        doc = docx.Document(io.BytesIO(file_bytes))
+        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+        for table in doc.tables:
+            for row in table.rows:
+                paragraphs.extend([cell.text.strip() for cell in row.cells if cell.text.strip()])
+        if paragraphs:
+            return "\n\n".join(paragraphs)
+    except Exception:
+        pass
+
+    # 2. Try PDF (pdfplumber)
+    try:
+        import pdfplumber
+        import io
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            text_pages = [page.extract_text() or "" for page in pdf.pages]
+            full_text = "\n\n".join(t for t in text_pages if t.strip())
+            if full_text.strip():
+                return full_text
+    except Exception:
+        pass
+
+    # 3. Fallback to utf-8 decode with cleanup
+    try:
+        decoded = file_bytes.decode("utf-8", errors="ignore")
+        # filter printable characters only
+        return "".join(c for c in decoded if c.isprintable() or c in "\n\r\t ")
+    except Exception:
+        return "Rapport de Projet de Fin d'Études"
 
 
 def _compute_score(linguistic: float, structural: float, coherence: float) -> float:

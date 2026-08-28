@@ -1,42 +1,133 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { AppShell, type NavItem } from "../../components/layout/AppShell"
 import { Card, Avatar } from "../../components/ui/Primitives"
 import { Button } from "../../components/ui/Button"
-import { StatusBadge } from "../../components/ui/Badge"
-import { IconReport, IconStudent, IconBell, IconSparkles } from "../../components/ui/Icons"
+import { StatusBadge, type BadgeVariant } from "../../components/ui/Badge"
+import { IconReport, IconStudent, IconBell, IconSparkles, IconUpload } from "../../components/ui/Icons"
+import { api, type Annotation, type Project, type ReportHistory, type User } from "../../lib/api"
 
 const navItems: NavItem[] = [
-  { key: "students", label: "Mes étudiants", icon: <IconStudent size={18} /> },
+  { key: "students", label: "Mes etudiants", icon: <IconStudent size={18} /> },
   { key: "reports", label: "Rapports", icon: <IconReport size={18} /> },
   { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
 ]
 
 const pages = Array.from({ length: 32 }, (_, i) => i + 1)
-const annotatedPages = new Set([4, 12, 24])
 
-interface Annotation {
-  id: string
-  author: string
-  date: string
-  text: string
+function statusToBadge(status?: string): BadgeVariant {
+  if (status === "COMPLETED") return "analysed"
+  if (status === "PROCESSING") return "reviewing"
+  if (status === "FAILED") return "rejected"
+  return "pending"
 }
 
-const existingAnnotations: Annotation[] = [
-  { id: "a1", author: "Pr. Saïd Amrani", date: "19 juil. 2026", text: "La méthodologie gagnerait à préciser le protocole d'évaluation croisée." },
-]
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", year: "numeric" }).format(
+    new Date(value),
+  )
+}
 
-export function ReportReviewer({ onExit }: { onExit: () => void }) {
-  const [currentPage, setCurrentPage] = useState(12)
-  const [annotations, setAnnotations] = useState<Annotation[]>(existingAnnotations)
+export function ReportReviewer({ onExit, user }: { onExit: () => void; user?: User | null }) {
+  const [currentPage, setCurrentPage] = useState(1)
+  const [project, setProject] = useState<Project | null>(null)
+  const [history, setHistory] = useState<ReportHistory | null>(null)
+  const [versionNumber, setVersionNumber] = useState(1)
+  const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [draft, setDraft] = useState("")
+  const [notice, setNotice] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const submitAnnotation = () => {
-    if (!draft.trim()) return
-    setAnnotations((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), author: "Pr. Saïd Amrani", date: "aujourd'hui", text: draft.trim() },
-    ])
-    setDraft("")
+  const userName = user ? `${user.first_name} ${user.last_name}` : "Encadreur"
+  const selectedVersion = useMemo(
+    () => history?.versions.find((version) => version.version_number === versionNumber),
+    [history, versionNumber],
+  )
+  const visibleAnnotations = annotations.filter((annotation) => annotation.page_number === currentPage)
+  const annotatedPages = useMemo(
+    () => new Set(annotations.map((annotation) => annotation.page_number)),
+    [annotations],
+  )
+
+  useEffect(() => {
+    let isMounted = true
+
+    const load = async () => {
+      if (!user) return
+      setIsLoading(true)
+      setNotice("")
+      try {
+        const [projectData, historyData] = await Promise.all([
+          api.getMyProject().catch(() => null),
+          api.getReportHistory().catch(() => null),
+        ])
+        if (!isMounted) return
+        setProject(projectData)
+        setHistory(historyData)
+        setVersionNumber(historyData?.current_version || 1)
+        if (!projectData) setNotice("Aucun projet assigne pour le moment.")
+        else if (!historyData) setNotice("Aucun rapport depose par cet etudiant.")
+      } catch (err) {
+        if (isMounted) setNotice(err instanceof Error ? err.message : "Impossible de charger le rapport.")
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [user])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadAnnotations = async () => {
+      if (!history) return
+      try {
+        const data = await api.getAnnotations(history.id, versionNumber)
+        if (isMounted) setAnnotations(data)
+      } catch (err) {
+        if (isMounted) setNotice(err instanceof Error ? err.message : "Impossible de charger les annotations.")
+      }
+    }
+
+    loadAnnotations()
+    return () => {
+      isMounted = false
+    }
+  }, [history, versionNumber])
+
+  const submitAnnotation = async () => {
+    if (!draft.trim() || !history) return
+    setIsSubmitting(true)
+    setNotice("")
+    try {
+      const annotation = await api.createAnnotation(history.id, versionNumber, currentPage, draft.trim())
+      setAnnotations((prev) => [...prev, annotation])
+      setDraft("")
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Annotation impossible.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const downloadVersion = async () => {
+    try {
+      const response = await fetch(api.getDownloadUrl(versionNumber), { headers: api.getAuthHeaders() })
+      if (!response.ok) throw new Error("Telechargement impossible.")
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = selectedVersion?.original_file_name ?? `rapport_v${versionNumber}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Telechargement impossible.")
+    }
   }
 
   return (
@@ -45,28 +136,46 @@ export function ReportReviewer({ onExit }: { onExit: () => void }) {
       activeKey="reports"
       onNavigate={() => {}}
       onExit={onExit}
-      userName="Pr. Saïd Amrani"
-      userRole="Encadreur · Génie informatique"
+      userName={userName}
+      userRole="Encadreur"
     >
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-bold font-display text-neutral-900">
-              Détection d'anomalies réseau par apprentissage automatique
+              {project?.title ?? "Rapport etudiant"}
             </h1>
             <p className="text-sm text-neutral-500 font-body mt-1 flex items-center gap-2">
-              Karim Boumediene · <StatusBadge variant="analysed" />
+              {project?.description || "Projet associe a votre compte"} <StatusBadge variant={statusToBadge(selectedVersion?.ai_analysis_status)} />
             </p>
           </div>
-          <select className="text-sm font-body border border-neutral-300 rounded-lg px-3 py-2 text-neutral-700">
-            <option>Version 3 — 18 juil. 2026</option>
-            <option>Version 2 — 02 juil. 2026</option>
-            <option>Version 1 — 20 juin 2026</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={versionNumber}
+              onChange={(event) => setVersionNumber(Number(event.target.value))}
+              className="text-sm font-body border border-neutral-300 rounded-lg px-3 py-2 text-neutral-700"
+              disabled={!history}
+            >
+              {(history?.versions ?? []).map((version) => (
+                <option key={version.version_number} value={version.version_number}>
+                  Version {version.version_number} - {formatDate(version.uploaded_at)}
+                </option>
+              ))}
+              {!history && <option>Pas de version</option>}
+            </select>
+            <Button variant="secondary" size="sm" icon={<IconUpload size={14} />} onClick={downloadVersion} disabled={!history}>
+              Telecharger
+            </Button>
+          </div>
         </div>
 
+        {notice && (
+          <p className="mb-4 rounded-lg bg-neutral-100 px-3 py-2 text-sm text-neutral-600 font-body">
+            {notice}
+          </p>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
-          {/* Visionneuse PDF */}
           <Card padded={false} className="overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 bg-neutral-50">
               <div className="flex items-center gap-2">
@@ -75,7 +184,7 @@ export function ReportReviewer({ onExit }: { onExit: () => void }) {
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
-                  ←
+                  {"<-"}
                 </button>
                 <span className="text-sm font-body text-neutral-600">
                   Page {currentPage} / {pages.length}
@@ -85,19 +194,17 @@ export function ReportReviewer({ onExit }: { onExit: () => void }) {
                   onClick={() => setCurrentPage((p) => Math.min(pages.length, p + 1))}
                   disabled={currentPage === pages.length}
                 >
-                  →
+                  {"->"}
                 </button>
               </div>
               <div className="flex items-center gap-2 text-sm font-body text-neutral-500">
-                <button className="hover:text-neutral-800">−</button>
-                <span>100%</span>
-                <button className="hover:text-neutral-800">+</button>
+                <span>{isLoading ? "Chargement..." : selectedVersion?.original_file_name ?? "Aucun fichier"}</span>
               </div>
             </div>
 
             <div className="bg-neutral-100 py-8 flex justify-center">
               <div className="bg-white shadow-sm w-[440px] aspect-[210/297] rounded-sm p-8 text-xs text-neutral-300 font-body leading-relaxed">
-                <p className="text-neutral-500 font-semibold mb-2">Chapitre 3 — Méthodologie</p>
+                <p className="text-neutral-500 font-semibold mb-2">Apercu du rapport</p>
                 {Array.from({ length: 14 }).map((_, i) => (
                   <div key={i} className="h-2 bg-neutral-100 rounded mb-2" style={{ width: `${90 - (i % 4) * 10}%` }} />
                 ))}
@@ -124,23 +231,22 @@ export function ReportReviewer({ onExit }: { onExit: () => void }) {
             </div>
           </Card>
 
-          {/* Panneau d'annotations */}
           <Card padded={false} className="flex flex-col">
             <div className="px-4 py-3 border-b border-neutral-200">
               <h2 className="font-semibold font-display text-neutral-800 text-sm">
-                Annotations — page {currentPage}
+                Annotations - page {currentPage}
               </h2>
             </div>
             <div className="flex-1 p-4 space-y-4 overflow-y-auto min-h-[240px]">
-              {annotations.length === 0 && (
+              {visibleAnnotations.length === 0 && (
                 <p className="text-sm text-neutral-400 font-body">Aucune annotation sur cette page.</p>
               )}
-              {annotations.map((a) => (
+              {visibleAnnotations.map((a) => (
                 <div key={a.id} className="flex gap-2.5">
-                  <Avatar name={a.author} size="sm" />
+                  <Avatar name={userName} size="sm" />
                   <div>
-                    <p className="text-xs text-neutral-400 font-body">{a.date}</p>
-                    <p className="text-sm text-neutral-700 font-body leading-relaxed">{a.text}</p>
+                    <p className="text-xs text-neutral-400 font-body">{formatDate(a.created_at)}</p>
+                    <p className="text-sm text-neutral-700 font-body leading-relaxed">{a.content}</p>
                   </div>
                 </div>
               ))}
@@ -152,16 +258,17 @@ export function ReportReviewer({ onExit }: { onExit: () => void }) {
                 placeholder="Ajouter une annotation sur cette page..."
                 rows={3}
                 className="w-full text-sm font-body border border-neutral-300 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-500"
+                disabled={!history}
               />
-              <Button fullWidth size="sm" className="mt-2" onClick={submitAnnotation}>
-                Ajouter le commentaire
+              <Button fullWidth size="sm" className="mt-2" onClick={submitAnnotation} disabled={!history || isSubmitting}>
+                {isSubmitting ? "Ajout..." : "Ajouter le commentaire"}
               </Button>
             </div>
           </Card>
         </div>
 
         <div className="flex justify-end mt-5">
-          <Button variant="ai" size="sm" icon={<IconSparkles size={14} />}>
+          <Button variant="ai" size="sm" icon={<IconSparkles size={14} />} disabled={!history}>
             Voir l'analyse IA de cette version
           </Button>
         </div>

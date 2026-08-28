@@ -1,2 +1,259 @@
-Unable to create process using '"C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 ': Une ouverture de session spécifiée n?existe pas. Elle est peut-être déjà terminée.
+INFO:     Started server process [19252]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\uvicorn\protocols\http\httptools_impl.py", line 422, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\applications.py", line 1163, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 145, in app
+    await response(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\responses.py", line 170, in __call__
+    await self.background()
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\background.py", line 36, in __call__
+    await task()
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\background.py", line 23, in __call__
+    await run_in_threadpool(self.func, *self.args, **self.kwargs)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\anyio\_backends\_asyncio.py", line 2641, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\anyio\_backends\_asyncio.py", line 1033, in run
+    result = context.run(func, *args)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\app\core\email.py", line 40, in send_email_confirmation
+    smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\AppData\Local\Programs\Python\Python313\Lib\smtplib.py", line 764, in login
+    raise last_exception
+  File "C:\Users\khair\AppData\Local\Programs\Python\Python313\Lib\smtplib.py", line 753, in login
+    (code, resp) = self.auth(
+                   ~~~~~~~~~^
+        authmethod, getattr(self, method_name),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        initial_response_ok=initial_response_ok)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\AppData\Local\Programs\Python\Python313\Lib\smtplib.py", line 671, in auth
+    raise SMTPAuthenticationError(code, resp)
+smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials a640c23a62f3a-c249606bd05sm1710936266b.2 - gsmtp')
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\pool.py", line 1262, in connect
+    sock = _configured_socket(self.address, self.opts)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\pool.py", line 862, in _configured_socket
+    sock = _create_connection(address, options)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\pool.py", line 846, in _create_connection
+    raise err
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\pool.py", line 839, in _create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
 
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\uvicorn\protocols\http\httptools_impl.py", line 422, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\applications.py", line 1163, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\fastapi\routing.py", line 352, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\app\api\v1\endpoints\ai.py", line 21, in get_ai_analysis
+    report = await Report.get(report_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\beanie\odm\documents.py", line 276, in get
+    return await cls.find_one(
+           ^^^^^^^^^^^^^^^^^^^
+    ...<8 lines>...
+    )
+    ^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\beanie\odm\queries\find.py", line 1030, in __await__
+    document = yield from self._find_one().__await__()  # type: ignore
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\beanie\odm\queries\find.py", line 997, in _find_one
+    return await self.document_model.get_motor_collection().find_one(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\khair\AppData\Local\Programs\Python\Python313\Lib\concurrent\futures\thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\collection.py", line 1709, in find_one
+    for result in cursor.limit(-1):
+                  ~~~~~~~~~~~~^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\cursor.py", line 1281, in __next__
+    return self.next()
+           ~~~~~~~~~^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\cursor.py", line 1257, in next
+    if len(self._data) or self._refresh():
+                          ~~~~~~~~~~~~~^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\cursor.py", line 1205, in _refresh
+    self._send_message(q)
+    ~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\cursor.py", line 1100, in _send_message
+    response = client._run_operation(
+        operation, self._unpack_response, address=self._address
+    )
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\_csot.py", line 120, in csot_wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 1754, in _run_operation
+    return self._retryable_read(
+           ~~~~~~~~~~~~~~~~~~~~^
+        _cmd,
+        ^^^^^
+    ...<4 lines>...
+        operation=operation.name,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 1863, in _retryable_read
+    return self._retry_internal(
+           ~~~~~~~~~~~~~~~~~~~~^
+        func,
+        ^^^^^
+    ...<7 lines>...
+        operation_id=operation_id,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\_csot.py", line 120, in csot_wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 1830, in _retry_internal
+    ).run()
+      ~~~^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 2554, in run
+    return self._read() if self._is_read else self._write()
+           ~~~~~~~~~~^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 2691, in _read
+    with self._client._conn_from_server(self._read_pref, self._server, self._session) as (
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\AppData\Local\Programs\Python\Python313\Lib\contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 1683, in _conn_from_server
+    with self._checkout(server, session) as conn:
+         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\AppData\Local\Programs\Python\Python313\Lib\contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 1593, in _checkout
+    with server.checkout(handler=err_handler) as conn:
+         ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\AppData\Local\Programs\Python\Python313\Lib\contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\pool.py", line 1336, in checkout
+    conn = self._get_conn(checkout_started_time, handler=handler)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\pool.py", line 1495, in _get_conn
+    conn = self.connect(handler=handler)
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\pool.py", line 1282, in connect
+    _raise_connection_failure(self.address, error, timeout_details=details)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\khair\Desktop\encadrini ai\encadrini-ai\backend\env\Lib\site-packages\pymongo\synchronous\pool.py", line 208, in _raise_connection_failure
+    raise AutoReconnect(msg) from error
+pymongo.errors.AutoReconnect: ac-ejf5ydj-shard-00-01.uvl8ama.mongodb.net:27017: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre (configured timeouts: connectTimeoutMS: 20000.0ms)

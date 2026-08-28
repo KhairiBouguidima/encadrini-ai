@@ -23,6 +23,20 @@ class UserUpdate(BaseModel):
     phone_number: Optional[str] = None
     openai_api_key: Optional[str] = None
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
 class UserResponse(BaseModel):
     id: str
     email: EmailStr

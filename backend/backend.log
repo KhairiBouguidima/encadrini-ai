@@ -1,0 +1,136 @@
+INFO:     127.0.0.1:60464 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60465 - "OPTIONS /api/v1/auth/register HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51446 - "OPTIONS /api/v1/auth/register HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51446 - "POST /api/v1/auth/register HTTP/1.1" 201 Created
+INFO:     127.0.0.1:50670 - "OPTIONS /api/v1/auth/confirm-email?token= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65413 - "OPTIONS /api/v1/auth/confirm-email?token= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50670 - "GET /api/v1/auth/confirm-email?token= HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:50670 - "GET /api/v1/auth/confirm-email?token= HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:61351 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61351 - "POST /api/v1/auth/login HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:64100 - "POST /api/v1/auth/login HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:56798 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56798 - "OPTIONS /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56798 - "OPTIONS /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63844 - "OPTIONS /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56798 - "GET /api/v1/projects/me HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56798 - "GET /api/v1/projects/me HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51408 - "GET /api/v1/reports/history HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51408 - "GET /api/v1/reports/history HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55622 - "OPTIONS /api/v1/projects/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55622 - "POST /api/v1/projects/ HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51525 - "OPTIONS /api/v1/reports/upload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51525 - "POST /api/v1/reports/upload HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51525 - "OPTIONS /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64236 - "OPTIONS /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51525 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64236 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:54779 - "OPTIONS /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65000 - "OPTIONS /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49850 - "OPTIONS /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49169 - "OPTIONS /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65000 - "GET /api/v1/projects/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:54779 - "GET /api/v1/reports/history HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49169 - "GET /api/v1/projects/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:54779 - "GET /api/v1/reports/history HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:53774 - "GET /api/v1/reports/history HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:53774 - "GET /api/v1/reports/history HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59446 - "GET /api/v1/projects/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51320 - "GET /api/v1/reports/history HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51320 - "GET /api/v1/projects/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59446 - "GET /api/v1/reports/history HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:56542 - "GET /api/v1/projects/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:56542 - "GET /api/v1/reports/history HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:52289 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52289 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52289 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52289 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56194 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56194 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56194 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56194 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56194 - "OPTIONS /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56194 - "OPTIONS /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56194 - "GET /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65373 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57581 - "OPTIONS /api/v1/reports/download/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57581 - "GET /api/v1/reports/download/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49671 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49671 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59048 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59048 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58408 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58408 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58408 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56466 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56466 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56466 - "GET /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52078 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51618 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57193 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51618 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57193 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57193 - "OPTIONS /api/v1/auth/confirm-email?token= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51618 - "OPTIONS /api/v1/auth/confirm-email?token= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57193 - "GET /api/v1/auth/confirm-email?token= HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:57193 - "GET /api/v1/auth/confirm-email?token= HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:53294 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50018 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53294 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55658 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55658 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55658 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55658 - "GET /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53294 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53294 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53294 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53579 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54313 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53579 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54313 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54313 - "GET /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59240 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61962 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59240 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59240 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53547 - "GET /api/v1/auth/confirm-email?token= HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:53547 - "GET /api/v1/auth/confirm-email?token= HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:53547 - "OPTIONS /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53547 - "OPTIONS /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53547 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53547 - "OPTIONS /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53547 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57036 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53547 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58684 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55393 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58684 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63472 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63472 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63472 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63472 - "GET /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58684 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62975 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62975 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57313 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62975 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64328 - "OPTIONS /api/v1/reports/upload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64328 - "POST /api/v1/reports/upload HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:59622 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59622 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59622 - "OPTIONS /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52619 - "OPTIONS /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59622 - "GET /api/v1/annotations/reports/6a8d9534ef8e94257ea6a414/version/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52619 - "GET /api/v1/ai/reports/6a8d9534ef8e94257ea6a414/version/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53060 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53060 - "GET /api/v1/projects/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54430 - "GET /api/v1/reports/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54430 - "GET /api/v1/reports/history HTTP/1.1" 200 OK

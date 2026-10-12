@@ -3,12 +3,14 @@ import { AppShell, type NavItem } from "../../components/layout/AppShell"
 import { Card, Avatar } from "../../components/ui/Primitives"
 import { Tag } from "../../components/ui/Primitives"
 import { Button } from "../../components/ui/Button"
-import { IconReport, IconSparkles, IconBell, IconChevronRight, IconUpload } from "../../components/ui/Icons"
+import { IconReport, IconSparkles, IconChevronRight, IconUpload, IconBell, IconUser } from "../../components/ui/Icons"
 import { api, type AIAnalysisResponse, type Annotation, type ReportHistory, type User } from "../../lib/api"
 
 const navItems: NavItem[] = [
   { key: "dashboard", label: "Tableau de bord", icon: <IconReport size={18} /> },
   { key: "workshop", label: "Atelier IA", icon: <IconSparkles size={18} /> },
+  { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
+  { key: "profile", label: "Mon Profil & Encadreur", icon: <IconUser size={18} /> },
 ]
 
 const keywords = ["Machine Learning", "Detection d'anomalies", "Securite reseau", "Deep Learning", "Big Data"]
@@ -51,6 +53,7 @@ export function ReportVersionDetail({
   score = 82,
   onBack,
   onOpenWorkshop,
+  onNavigate,
   onExit,
   user,
 }: {
@@ -58,6 +61,7 @@ export function ReportVersionDetail({
   score?: number
   onBack: () => void
   onOpenWorkshop: () => void
+  onNavigate?: (key: string) => void
   onExit: () => void
   user?: User | null
 }) {
@@ -146,7 +150,15 @@ export function ReportVersionDetail({
     <AppShell
       navItems={navItems}
       activeKey="dashboard"
-      onNavigate={(key) => key === "workshop" && onOpenWorkshop()}
+      onNavigate={(key) => {
+        if (key === "dashboard") {
+          onBack()
+        } else if (key === "workshop") {
+          onOpenWorkshop()
+        } else if (onNavigate) {
+          onNavigate(key)
+        }
+      }}
       onExit={onExit}
       userName={userName}
       userRole="Etudiant - M2 informatique"

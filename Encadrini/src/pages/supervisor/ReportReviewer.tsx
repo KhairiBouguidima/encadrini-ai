@@ -3,13 +3,14 @@ import { AppShell, type NavItem } from "../../components/layout/AppShell"
 import { Card, Avatar } from "../../components/ui/Primitives"
 import { Button } from "../../components/ui/Button"
 import { StatusBadge, type BadgeVariant } from "../../components/ui/Badge"
-import { IconReport, IconStudent, IconBell, IconSparkles, IconUpload } from "../../components/ui/Icons"
+import { IconReport, IconBell, IconSparkles, IconUpload, IconUser } from "../../components/ui/Icons"
 import { api, type Annotation, type Project, type ReportHistory, type User } from "../../lib/api"
 
 const navItems: NavItem[] = [
-  { key: "students", label: "Mes etudiants", icon: <IconStudent size={18} /> },
-  { key: "reports", label: "Rapports", icon: <IconReport size={18} /> },
+  { key: "reports", label: "Rapports PFE", icon: <IconReport size={18} /> },
+  { key: "workshop", label: "Atelier IA", icon: <IconSparkles size={18} /> },
   { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
+  { key: "profile", label: "Mon Profil", icon: <IconUser size={18} /> },
 ]
 
 const pages = Array.from({ length: 32 }, (_, i) => i + 1)
@@ -27,9 +28,19 @@ function formatDate(value: string) {
   )
 }
 
-export function ReportReviewer({ onExit, user }: { onExit: () => void; user?: User | null }) {
+export function ReportReviewer({
+  onExit,
+  onNavigate,
+  user,
+}: {
+  onExit: () => void
+  onNavigate?: (key: string) => void
+  user?: User | null
+}) {
   const [currentPage, setCurrentPage] = useState(1)
   const [project, setProject] = useState<Project | null>(null)
+  const [reports, setReports] = useState<ReportHistory[]>([])
+  const [selectedReportId, setSelectedReportId] = useState<string>("")
   const [history, setHistory] = useState<ReportHistory | null>(null)
   const [versionNumber, setVersionNumber] = useState(1)
   const [annotations, setAnnotations] = useState<Annotation[]>([])
@@ -57,18 +68,24 @@ export function ReportReviewer({ onExit, user }: { onExit: () => void; user?: Us
       setIsLoading(true)
       setNotice("")
       try {
-        const [projectData, historyData] = await Promise.all([
+        const [projectData, reportsData] = await Promise.all([
           api.getMyProject().catch(() => null),
-          api.getReportHistory().catch(() => null),
+          api.getReports().catch(() => []),
         ])
         if (!isMounted) return
         setProject(projectData)
-        setHistory(historyData)
-        setVersionNumber(historyData?.current_version || 1)
-        if (!projectData) setNotice("Aucun projet assigne pour le moment.")
-        else if (!historyData) setNotice("Aucun rapport depose par cet etudiant.")
+        setReports(reportsData)
+        if (reportsData.length > 0) {
+          const first = reportsData[0]
+          setSelectedReportId(first.id)
+          setHistory(first)
+          setVersionNumber(first.current_version || 1)
+        } else {
+          setNotice("Aucun rapport déposé par cet étudiant pour le moment.")
+        }
+        if (!projectData) setNotice("Aucun projet assigné pour le moment.")
       } catch (err) {
-        if (isMounted) setNotice(err instanceof Error ? err.message : "Impossible de charger le rapport.")
+        if (isMounted) setNotice(err instanceof Error ? err.message : "Impossible de charger les rapports.")
       } finally {
         if (isMounted) setIsLoading(false)
       }
@@ -79,6 +96,16 @@ export function ReportReviewer({ onExit, user }: { onExit: () => void; user?: Us
       isMounted = false
     }
   }, [user])
+
+  const handleReportChange = (reportId: string) => {
+    setSelectedReportId(reportId)
+    const found = reports.find((r) => r.id === reportId)
+    if (found) {
+      setHistory(found)
+      setVersionNumber(found.current_version || 1)
+      setCurrentPage(1)
+    }
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -115,9 +142,10 @@ export function ReportReviewer({ onExit, user }: { onExit: () => void; user?: Us
   }
 
   const downloadVersion = async () => {
+    if (!history) return
     try {
-      const response = await fetch(api.getDownloadUrl(versionNumber), { headers: api.getAuthHeaders() })
-      if (!response.ok) throw new Error("Telechargement impossible.")
+      const response = await fetch(api.getDownloadUrl(versionNumber, history.id), { headers: api.getAuthHeaders() })
+      if (!response.ok) throw new Error("Téléchargement impossible.")
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
@@ -126,7 +154,7 @@ export function ReportReviewer({ onExit, user }: { onExit: () => void; user?: Us
       link.click()
       URL.revokeObjectURL(url)
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Telechargement impossible.")
+      setNotice(err instanceof Error ? err.message : "Téléchargement impossible.")
     }
   }
 
@@ -134,37 +162,59 @@ export function ReportReviewer({ onExit, user }: { onExit: () => void; user?: Us
     <AppShell
       navItems={navItems}
       activeKey="reports"
-      onNavigate={() => {}}
+      onNavigate={(key) => onNavigate && onNavigate(key)}
       onExit={onExit}
       userName={userName}
       userRole="Encadreur"
     >
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-xl font-bold font-display text-neutral-900">
-              {project?.title ?? "Rapport etudiant"}
+              {project?.title ?? "Rapport étudiant"}
             </h1>
-            <p className="text-sm text-neutral-500 font-body mt-1 flex items-center gap-2">
-              {project?.description || "Projet associe a votre compte"} <StatusBadge variant={statusToBadge(selectedVersion?.ai_analysis_status)} />
+            <p className="text-sm text-neutral-600 font-body mt-1 flex flex-wrap items-center gap-2">
+              {project?.student_name && (
+                <span className="font-semibold text-primary-700 bg-primary-50 px-2.5 py-0.5 rounded-md">
+                  👨‍🎓 Étudiant : {project.student_name} {project.student_email ? `(${project.student_email})` : ""}
+                </span>
+              )}
+              <span>{project?.description || "Projet associé à votre compte"}</span>
+              {selectedVersion && <StatusBadge variant={statusToBadge(selectedVersion?.ai_analysis_status)} />}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Report selector */}
+            {reports.length > 0 && (
+              <select
+                value={selectedReportId}
+                onChange={(event) => handleReportChange(event.target.value)}
+                className="text-sm font-body border border-neutral-300 rounded-lg px-3 py-2 text-neutral-800 bg-white font-semibold"
+              >
+                {reports.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    📄 {r.title} ({r.report_type})
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Version selector */}
             <select
               value={versionNumber}
               onChange={(event) => setVersionNumber(Number(event.target.value))}
-              className="text-sm font-body border border-neutral-300 rounded-lg px-3 py-2 text-neutral-700"
-              disabled={!history}
+              className="text-sm font-body border border-neutral-300 rounded-lg px-3 py-2 text-neutral-700 bg-white"
+              disabled={!history || !history.versions || history.versions.length === 0}
             >
               {(history?.versions ?? []).map((version) => (
                 <option key={version.version_number} value={version.version_number}>
                   Version {version.version_number} - {formatDate(version.uploaded_at)}
                 </option>
               ))}
-              {!history && <option>Pas de version</option>}
+              {(!history || !history.versions || history.versions.length === 0) && <option>Pas de version</option>}
             </select>
-            <Button variant="secondary" size="sm" icon={<IconUpload size={14} />} onClick={downloadVersion} disabled={!history}>
-              Telecharger
+            <Button variant="secondary" size="sm" icon={<IconUpload size={14} />} onClick={downloadVersion} disabled={!history || !selectedVersion}>
+              Télécharger
             </Button>
           </div>
         </div>

@@ -16,7 +16,9 @@ export function LoginPage({
     sessionStorage.removeItem("encadrini_login_notice")
     return storedNotice
   })
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(() => {
+    return sessionStorage.getItem("encadrini_pending_invitation_email") ?? ""
+  })
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -24,10 +26,21 @@ export function LoginPage({
   const submitLogin = async () => {
     setError("")
     setNotice("")
+
+    const cleanEmail = email.trim().toLowerCase()
+    if (!cleanEmail) {
+      setError("Veuillez saisir votre adresse email.")
+      return
+    }
+    if (!password) {
+      setError("Veuillez saisir votre mot de passe.")
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
-      const session = await api.login(email, password)
+      const session = await api.login(cleanEmail, password)
       saveSession(session)
       onAuthenticated(session.user)
     } catch (err) {

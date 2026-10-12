@@ -10,6 +10,14 @@ class AIAnalysisStatus(str, Enum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
+class ReportType(str, Enum):
+    PFE = "PFE"
+    CAHIER_CHARGES = "CAHIER_CHARGES"
+    AVANCEMENT = "AVANCEMENT"
+    INTERMEDIAIRE = "INTERMEDIAIRE"
+    FINAL = "FINAL"
+    AUTRE = "AUTRE"
+
 class ReportVersion(BaseModel):
     version_number: int
     original_file_name: str
@@ -21,10 +29,14 @@ class ReportVersion(BaseModel):
     ai_analysis_status: AIAnalysisStatus = AIAnalysisStatus.PENDING
 
 class Report(Document):
-    project_id: Indexed(PydanticObjectId, unique=True)
+    project_id: Indexed(PydanticObjectId)
+    title: str = "Rapport principal"
+    report_type: ReportType = ReportType.PFE
+    description: Optional[str] = ""
     current_version: int = 0
     versions: List[ReportVersion] = []
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "reports"

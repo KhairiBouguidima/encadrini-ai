@@ -103,3 +103,73 @@ export function IconSend({ size = 18, className = "" }: IconProps) {
     </svg>
   )
 }
+
+export function IconUser({ size = 20, className = "" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className}>
+      <circle cx="10" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 17c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconPlus({ size = 18, className = "" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className}>
+      <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function IconCalendar({ size = 18, className = "" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className}>
+      <rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M3 8h14M7 2v3M13 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconDownload({ size = 18, className = "" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className}>
+      <path d="M10 3v10M6 9l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 16h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconFileText({ size = 18, className = "" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className}>
+      <path d="M5 2h7l4 4v12H5V2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 2v4h4M8 10h5M8 13h5M8 7h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function IconEdit({ size = 18, className = "" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className}>
+      <path d="M13.5 3.5l3 3L6 17H3v-3L13.5 3.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function IconTrash({ size = 18, className = "" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className}>
+      <path d="M4 6h12M7 6V4h6v2M6 6v10a1 1 0 001 1h6a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 9v5M12 9v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconLogout({ size = 18, className = "" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className}>
+      <path d="M13 15l4-4-4-4M17 11H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 3H5a2 2 0 00-2 2v10a2 2 0 002 2h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}

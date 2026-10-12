@@ -2,14 +2,15 @@ import { useEffect, useMemo, useState } from "react"
 import { AppShell, type NavItem } from "../../components/layout/AppShell"
 import { Card } from "../../components/ui/Primitives"
 import { StatusBadge, type BadgeVariant } from "../../components/ui/Badge"
-import { IconStats, IconStudent, IconReport, IconSettings, IconSearch } from "../../components/ui/Icons"
+import { IconStats, IconStudent, IconReport, IconSearch, IconBell, IconUser } from "../../components/ui/Icons"
 import { api, type AdminProject, type AdminUser, type PlatformStats, type User } from "../../lib/api"
 
 const navItems: NavItem[] = [
   { key: "overview", label: "Vue d'ensemble", icon: <IconStats size={18} /> },
   { key: "users", label: "Comptes", icon: <IconStudent size={18} /> },
   { key: "projects", label: "Projets PFE", icon: <IconReport size={18} /> },
-  { key: "settings", label: "Parametres", icon: <IconSettings size={18} /> },
+  { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
+  { key: "profile", label: "Mon Profil", icon: <IconUser size={18} /> },
 ]
 
 function roleLabel(role: AdminUser["role"]) {
@@ -34,7 +35,15 @@ function formatDate(value: string) {
   )
 }
 
-export function AdminDashboard({ onExit, user }: { onExit: () => void; user?: User | null }) {
+export function AdminDashboard({
+  onExit,
+  onNavigate,
+  user,
+}: {
+  onExit: () => void
+  onNavigate?: (key: string) => void
+  user?: User | null
+}) {
   const [stats, setStats] = useState<PlatformStats | null>(null)
   const [accounts, setAccounts] = useState<AdminUser[]>([])
   const [projects, setProjects] = useState<AdminProject[]>([])
@@ -101,7 +110,7 @@ export function AdminDashboard({ onExit, user }: { onExit: () => void; user?: Us
     <AppShell
       navItems={navItems}
       activeKey="overview"
-      onNavigate={() => {}}
+      onNavigate={(key) => onNavigate && onNavigate(key)}
       onExit={onExit}
       userName={userName}
       userRole="Administrateur plateforme"

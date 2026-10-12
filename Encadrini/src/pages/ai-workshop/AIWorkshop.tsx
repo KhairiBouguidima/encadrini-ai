@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react"
 import { AppShell, type NavItem } from "../../components/layout/AppShell"
 import { Card } from "../../components/ui/Primitives"
 import { Button } from "../../components/ui/Button"
-import { IconReport, IconSparkles, IconBell, IconSend, IconCheck } from "../../components/ui/Icons"
+import { IconReport, IconSparkles, IconSend, IconCheck, IconBell, IconUser } from "../../components/ui/Icons"
 import { api, type AIAnalysisResponse, type User } from "../../lib/api"
 
 const navItems: NavItem[] = [
   { key: "dashboard", label: "Tableau de bord", icon: <IconReport size={18} /> },
   { key: "workshop", label: "Atelier IA", icon: <IconSparkles size={18} /> },
+  { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
+  { key: "profile", label: "Mon Profil & Encadreur", icon: <IconUser size={18} /> },
 ]
 
 type Tab = "analyse" | "chat" | "checker"
@@ -27,11 +29,13 @@ function ScoreBadge({ score, label }: { score: number; label: string }) {
 
 export function AIWorkshop({
   onExit,
+  onNavigate,
   reportId,
   versionNumber,
   user,
 }: {
   onExit: () => void
+  onNavigate?: (key: string) => void
   reportId: string
   versionNumber: number
   user?: User | null
@@ -134,7 +138,7 @@ export function AIWorkshop({
     <AppShell
       navItems={navItems}
       activeKey="workshop"
-      onNavigate={() => {}}
+      onNavigate={(key) => onNavigate && onNavigate(key)}
       onExit={onExit}
       userName={userName}
       userRole={userRole}
@@ -178,24 +182,129 @@ export function AIWorkshop({
             {analysis && analysis.status === "COMPLETED" ? (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-5">
                 <div className="space-y-5">
-                  {/* Scores */}
-                  <Card>
-                    <h3 className="font-semibold font-display text-neutral-800 mb-4">Scores détaillés</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      {[
-                        { label: "Global", value: analysis.scores?.overall_quality },
-                        { label: "Structure", value: analysis.scores?.structural },
-                        { label: "Cohérence", value: analysis.scores?.coherence },
-                        { label: "Linguistique", value: analysis.scores?.linguistic },
-                      ].map(({ label, value }) => {
-                        const color = value != null && value >= 80 ? "border-success-400" : value != null && value >= 60 ? "border-warning-400" : "border-danger-400"
-                        return (
-                          <div key={label} className={`flex flex-col items-center p-3 rounded-xl border-2 ${color} bg-neutral-50`}>
-                            <span className="text-2xl font-bold font-display text-neutral-900">{value ?? "-"}</span>
-                            <span className="text-xs text-neutral-500 font-body mt-1">{label}</span>
+                  {/* Readiness Score Card (PFE Guide 5-Dimension Index) */}
+                  <Card className="bg-gradient-to-br from-white via-primary-50/20 to-ai-50/30 border-primary-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-4 mb-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold font-display text-neutral-900 text-lg">Indice de Maturité (Readiness Score)</h3>
+                          <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-primary-100 text-primary-800 border border-primary-200">
+                            PFE Guide Spec v1.0
+                          </span>
+                        </div>
+                        <p className="text-xs text-neutral-500 font-body mt-1">
+                          Évaluation globale agrégée sur 5 dimensions pondérées du rapport PFE.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-3xl font-extrabold font-display text-primary-700">
+                            {analysis.readiness_score ?? analysis.scores?.overall_quality ?? 0}/100
                           </div>
-                        )
-                      })}
+                          <span className={`inline-block text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                            (analysis.readiness_score ?? 0) >= 90
+                              ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                              : (analysis.readiness_score ?? 0) >= 75
+                              ? "bg-blue-100 text-blue-800 border-blue-300"
+                              : (analysis.readiness_score ?? 0) >= 60
+                              ? "bg-amber-100 text-amber-800 border-amber-300"
+                              : "bg-rose-100 text-rose-800 border-rose-300"
+                          }`}>
+                            {analysis.readiness_level || "Satisfaisant"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 5 Dimensions Breakdown */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider font-display">
+                        Évaluation par dimension (Guide PFE)
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          { key: "structure", label: "Structure & Complétude", weight: "25%", val: analysis.dimension_scores?.structure ?? analysis.scores?.structural ?? 70 },
+                          { key: "methodology", label: "Méthodologie & Problématique", weight: "25%", val: analysis.dimension_scores?.methodology ?? analysis.scores?.coherence ?? 75 },
+                          { key: "language", label: "Qualité de la langue & Registre", weight: "20%", val: analysis.dimension_scores?.language ?? analysis.scores?.linguistic ?? 80 },
+                          { key: "formatting", label: "Mise en page & Typographie", weight: "15%", val: analysis.dimension_scores?.formatting ?? 75 },
+                          { key: "citations", label: "Citations & Bibliographie", weight: "15%", val: analysis.dimension_scores?.citations ?? 70 },
+                        ].map((d) => (
+                          <div key={d.key} className="p-3 bg-white rounded-lg border border-neutral-200 shadow-2xs">
+                            <div className="flex justify-between items-center text-xs mb-1.5 font-body">
+                              <span className="font-semibold text-neutral-800">{d.label}</span>
+                              <span className="text-neutral-400 text-[10px]">Poids : {d.weight}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-neutral-100 h-2 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    d.val >= 80 ? "bg-emerald-500" : d.val >= 65 ? "bg-blue-500" : "bg-amber-500"
+                                  }`}
+                                  style={{ width: `${Math.min(100, Math.max(0, d.val))}%` }}
+                                />
+                              </div>
+                              <span className="text-xs font-bold font-display text-neutral-900 w-8 text-right">
+                                {Math.round(d.val)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Improvement Roadmap (Feuille de Route d'Amélioration) */}
+                  <Card>
+                    <div className="flex items-center justify-between mb-4 border-b border-neutral-100 pb-3">
+                      <div>
+                        <h3 className="font-semibold font-display text-neutral-800 flex items-center gap-2">
+                          🗺️ Feuille de Route d'Amélioration (Improvement Roadmap)
+                        </h3>
+                        <p className="text-xs text-neutral-500 font-body mt-0.5">
+                          Actions prioritaires classées par gain estimé pour maximiser votre note de soutenance.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {analysis.roadmap && analysis.roadmap.length > 0 ? (
+                        analysis.roadmap.map((act) => {
+                          const priorityColor =
+                            act.priority === "critical"
+                              ? "bg-rose-100 text-rose-800 border-rose-200"
+                              : act.priority === "important"
+                              ? "bg-amber-100 text-amber-800 border-amber-200"
+                              : "bg-blue-100 text-blue-800 border-blue-200"
+                          const priorityLabel =
+                            act.priority === "critical" ? "Critique" : act.priority === "important" ? "Important" : "Mineur"
+
+                          return (
+                            <div
+                              key={act.id}
+                              className="p-3.5 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-white hover:border-neutral-300 transition shadow-2xs"
+                            >
+                              <div className="flex items-start justify-between gap-3 mb-1">
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${priorityColor}`}>
+                                    {priorityLabel}
+                                  </span>
+                                  <h4 className="text-sm font-semibold font-display text-neutral-900">{act.title}</h4>
+                                </div>
+                                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-display flex-shrink-0">
+                                  +{act.estimated_gain} pts
+                                </span>
+                              </div>
+                              <p className="text-xs text-neutral-600 font-body mb-2 leading-relaxed">{act.description}</p>
+                              <div className="flex items-center justify-between text-[11px] text-neutral-400 font-body pt-2 border-t border-neutral-200/60">
+                                <span>Dimension : <strong className="text-neutral-700 capitalize">{act.dimension}</strong></span>
+                                <span>Effort estimé : <strong className="text-neutral-700">{act.estimated_effort}</strong></span>
+                              </div>
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <p className="text-sm text-neutral-500 font-body">Aucune action recommandée pour le moment.</p>
+                      )}
                     </div>
                   </Card>
 
@@ -227,14 +336,16 @@ export function AIWorkshop({
 
                   {/* Missing sections */}
                   <Card>
-                    <h3 className="font-semibold font-display text-neutral-800 mb-3">Sections manquantes</h3>
+                    <h3 className="font-semibold font-display text-neutral-800 mb-3">Sections & Chapitres du Guide PFE</h3>
                     {analysis.missing_sections?.length > 0 ? (
-                      <ul className="list-disc pl-5 space-y-1 text-sm font-body text-neutral-600">
-                        {analysis.missing_sections.map((s, i) => <li key={i}>{s}</li>)}
+                      <ul className="list-disc pl-5 space-y-1.5 text-sm font-body text-neutral-700">
+                        {analysis.missing_sections.map((s, i) => (
+                          <li key={i} className="leading-snug">{s}</li>
+                        ))}
                       </ul>
                     ) : (
                       <p className="text-sm text-success-600 font-body flex items-center gap-2">
-                        <IconCheck size={16} /> Aucune section vitale ne semble manquer.
+                        <IconCheck size={16} /> Toutes les sections essentielles de la structure PFE sont présentes.
                       </p>
                     )}
                   </Card>
@@ -244,17 +355,17 @@ export function AIWorkshop({
                 <Card padded={false} className="flex flex-col">
                   <div className="px-4 py-3 border-b border-neutral-200 flex items-center gap-2">
                     <IconSparkles size={16} className="text-ai-600" />
-                    <h2 className="font-semibold font-display text-neutral-800 text-sm">Généré par l'IA</h2>
+                    <h2 className="font-semibold font-display text-neutral-800 text-sm">Généré par l'IA (PFE Assistant)</h2>
                   </div>
                   <div className="flex-1 overflow-y-auto p-5 space-y-5">
                     <div>
-                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2">Résumé</h3>
+                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2">Résumé du rapport</h3>
                       <p className="text-sm font-body text-neutral-600 leading-relaxed">
                         {analysis.generated_content?.summary || "Non disponible"}
                       </p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2">Abstract (EN)</h3>
+                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2">Abstract (Anglais)</h3>
                       <p className="text-sm font-body text-neutral-500 leading-relaxed italic">
                         {analysis.generated_content?.abstract || "Non disponible"}
                       </p>
@@ -270,7 +381,26 @@ export function AIWorkshop({
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2">Questions du Jury</h3>
+                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2 flex items-center gap-1.5 text-amber-800">
+                        📐 Remarques & Défauts de mise en forme
+                      </h3>
+                      {analysis.generated_content?.formatting_issues && analysis.generated_content.formatting_issues.length > 0 ? (
+                        <div className="space-y-2 bg-amber-50/60 p-3 rounded-xl border border-amber-200/80">
+                          {analysis.generated_content.formatting_issues.map((issue, i) => (
+                            <div key={i} className="text-xs font-body text-amber-900 flex items-start gap-2 leading-relaxed">
+                              <span className="text-amber-600 font-bold">•</span>
+                              <span>{issue}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs font-body text-emerald-700 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                          ✓ Aucun défaut majeur de mise en forme détecté.
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2">Questions préparatoires pour le Jury</h3>
                       <ul className="space-y-2">
                         {analysis.generated_content?.jury_questions?.map((q, i) => (
                           <li key={i} className="text-sm font-body text-neutral-600 pl-3 border-l-2 border-ai-200 leading-relaxed">

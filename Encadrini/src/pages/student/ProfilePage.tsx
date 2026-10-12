@@ -1,13 +1,15 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AppShell, type NavItem } from "../../components/layout/AppShell"
 import { Card, Input, Avatar } from "../../components/ui/Primitives"
 import { Button } from "../../components/ui/Button"
-import { IconReport, IconSparkles, IconSupervisor, IconCheck } from "../../components/ui/Icons"
-import { api, saveSession, getAccessToken, type User } from "../../lib/api"
+import { IconReport, IconSparkles, IconSupervisor, IconCheck, IconBell, IconUser } from "../../components/ui/Icons"
+import { api, saveSession, getAccessToken, type User, type Project } from "../../lib/api"
 
 const navItems: NavItem[] = [
   { key: "dashboard", label: "Tableau de bord", icon: <IconReport size={18} /> },
   { key: "workshop", label: "Atelier IA", icon: <IconSparkles size={18} /> },
+  { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
+  { key: "profile", label: "Mon Profil & Encadreur", icon: <IconUser size={18} /> },
 ]
 
 export function ProfilePage({
@@ -32,6 +34,7 @@ export function ProfilePage({
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
 
   // Form states for inviting supervisor
+  const [project, setProject] = useState<Project | null>(null)
   const [encadrerEmail, setEncadrerEmail] = useState("")
   const [inviteNotice, setInviteNotice] = useState("")
   const [inviteLink, setInviteLink] = useState("")
@@ -39,6 +42,12 @@ export function ProfilePage({
 
   const userName = user ? `${user.first_name} ${user.last_name}` : "Profil Utilisateur"
   const userRole = user?.role === "ENCADRER" ? "Encadreur" : user?.role === "ADMIN" ? "Administrateur" : "Étudiant"
+
+  useEffect(() => {
+    if (user?.role === "STUDENT") {
+      api.getMyProject().then(setProject).catch(() => null)
+    }
+  }, [user])
 
   const handleProfileSave = async () => {
     setIsUpdatingProfile(true)
@@ -81,10 +90,18 @@ export function ProfilePage({
     setInviteLink("")
 
     try {
-      const res = await api.inviteSupervisor(encadrerEmail.trim())
-      setInviteLink(res.invitation_link)
-      setInviteNotice(`Invitation générée pour ${encadrerEmail} !`)
+      const email = encadrerEmail.trim()
+      const res = await api.inviteSupervisor(email)
+      if (res.email_sent) {
+        setInviteLink("")
+        setInviteNotice(`Invitation envoyée par email à ${email} !`)
+      } else {
+        setInviteLink(res.invitation_link)
+        setInviteNotice(`L'email n'a pas pu être envoyé. Partagez ce lien avec ${email} :`)
+      }
       setEncadrerEmail("")
+      const freshProject = await api.getMyProject().catch(() => null)
+      if (freshProject) setProject(freshProject)
     } catch (err) {
       setInviteNotice(err instanceof Error ? err.message : "Erreur lors de l'envoi de l'invitation.")
     } finally {
@@ -180,6 +197,18 @@ export function ProfilePage({
               <p className="text-sm text-neutral-600 font-body leading-relaxed">
                 Entrez l'adresse email de votre encadreur universitaire ou d'entreprise. Il recevra un lien sécurisé pour rejoindre la plateforme et suivre l'avancement de votre rapport PFE.
               </p>
+
+              {project?.encadrer_id && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1">
+                  <p className="font-semibold text-emerald-900 flex items-center gap-1.5">
+                    <IconCheck size={16} className="text-emerald-600" />
+                    Encadreur actuel : {project.encadrer_name || "Supervision active"}
+                  </p>
+                  {project.encadrer_email && (
+                    <p className="text-emerald-700 font-mono text-[11px] pl-5.5">{project.encadrer_email}</p>
+                  )}
+                </div>
+              )}
 
               <Input
                 label="Email de l'encadreur"

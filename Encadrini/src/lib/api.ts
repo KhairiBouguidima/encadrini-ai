@@ -34,19 +34,33 @@ export interface ReportVersion {
 export interface ReportHistory {
   id: string
   project_id: string
+  title: string
+  report_type: string
+  description?: string
   current_version: number
   versions: ReportVersion[]
   created_at: string
+  updated_at?: string
 }
 
 export interface Project {
   id: string
   student_id: string
   encadrer_id: string | null
+  encadrer_ids?: string[]
+  encadrer_name?: string | null
+  encadrer_email?: string | null
+  student_name?: string | null
+  student_email?: string | null
   title: string
   description: string
   status: string
+  progress: number
+  deadline?: string | null
+  tags: string[]
+  academic_year?: string
   created_at: string
+  updated_at?: string
 }
 
 export interface Annotation {
@@ -59,6 +73,25 @@ export interface Annotation {
   created_at: string
 }
 
+export interface RoadmapItem {
+  id: string
+  title: string
+  description: string
+  priority: "critical" | "important" | "minor"
+  dimension: "structure" | "methodology" | "language" | "formatting" | "citations"
+  estimated_gain: number
+  estimated_effort: string
+  completed: boolean
+}
+
+export interface DimensionScores {
+  structure: number
+  methodology: number
+  language: number
+  formatting: number
+  citations: number
+}
+
 export interface AIAnalysisResponse {
   status: AIAnalysisStatus
   report_id: string
@@ -69,6 +102,9 @@ export interface AIAnalysisResponse {
     coherence: number
     overall_quality: number
   } | null
+  readiness_score?: number
+  readiness_level?: string
+  dimension_scores?: DimensionScores | null
   missing_sections: string[]
   corrections: {
     page: number | null
@@ -81,7 +117,9 @@ export interface AIAnalysisResponse {
     abstract: string
     keywords: string[]
     jury_questions: string[]
+    formatting_issues?: string[]
   } | null
+  roadmap?: RoadmapItem[]
 }
 
 export interface AdminUser {
@@ -224,12 +262,12 @@ export const api = {
     password: string
     first_name: string
     last_name: string
-    faculty: string
-    gender: string
-    phone_number: string
-    role: UserRole
+    faculty?: string
+    gender?: string
+    phone_number?: string
+    role?: UserRole
   }) {
-    return request<User>("/auth/register", {
+    return request<TokenResponse>("/auth/register", {
       method: "POST",
       body: JSON.stringify(user),
     })
@@ -266,13 +304,71 @@ export const api = {
       body: JSON.stringify({ current_password, new_password })
     })
   },
+  resendConfirmation(email: string) {
+    return request<{ message: string }>("/auth/resend-confirmation", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    })
+  },
+  logout() {
+    return request<{ message: string }>("/auth/logout", {
+      method: "POST",
+    })
+  },
   getMyProject() {
     return request<Project>("/projects/me")
   },
-  createProject(title: string, description: string) {
+  createProject(title: string, description: string, tags: string[] = [], deadline?: string) {
     return request<Project>("/projects/", {
       method: "POST",
-      body: JSON.stringify({ title, description }),
+      body: JSON.stringify({ title, description, tags, deadline }),
+    })
+  },
+  updateMyProject(payload: Partial<Project>) {
+    return request<Project>("/projects/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    })
+  },
+  getReports(projectId?: string) {
+    const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""
+    return request<ReportHistory[]>(`/reports/${query}`)
+  },
+  getReport(reportId: string) {
+    return request<ReportHistory>(`/reports/${reportId}`)
+  },
+  createReport(data: { title: string; report_type: string; description?: string; file?: File }) {
+    const body = new FormData()
+    body.append("title", data.title)
+    body.append("report_type", data.report_type)
+    if (data.description) body.append("description", data.description)
+    if (data.file) body.append("file", data.file)
+    return request<ReportHistory>("/reports/", { method: "POST", body })
+  },
+  uploadReportTo(reportId: string, file: File) {
+    const body = new FormData()
+    body.append("file", file)
+    return request<ReportHistory>(`/reports/${reportId}/upload`, { method: "POST", body })
+  },
+  deleteReport(reportId: string) {
+    return request<void>(`/reports/${reportId}`, { method: "DELETE" })
+  },
+  previewInvitation(token: string) {
+    return request<{
+      token: string
+      project_id: string
+      student_id: string
+      student_name: string
+      project_title: string
+      project_description: string
+      encadrer_email: string
+      status: string
+      expires_at: string
+    }>(`/projects/invitations/preview?token=${encodeURIComponent(token)}`)
+  },
+  acceptInvitation(token: string) {
+    return request<Project>(`/projects/invitations/accept?token=${encodeURIComponent(token)}`, {
+      method: "POST",
     })
   },
   getReportHistory() {
@@ -319,13 +415,35 @@ export const api = {
     })
   },
   inviteSupervisor(encadrer_email: string) {
-    return request<{ id: string; invitation_link: string }>("/projects/invite", {
+    return request<{ id: string; invitation_link: string; email_sent: boolean }>("/projects/invite", {
       method: "POST",
       body: JSON.stringify({ encadrer_email }),
     })
   },
-  getDownloadUrl(versionNumber: number) {
-    return `${API_BASE_URL}/reports/download/${versionNumber}`
+  getDownloadUrl(versionNumber: number, reportId?: string) {
+    const q = reportId ? `?report_id=${encodeURIComponent(reportId)}` : ""
+    return `${API_BASE_URL}/reports/download/${versionNumber}${q}`
+  },
+  getNotifications() {
+    return request<{
+      notifications: {
+        id: string
+        type: string
+        title: string
+        message: string
+        is_read: boolean
+        link?: string
+        created_at: string
+      }[]
+      unread_count: number
+      total: number
+    }>("/notifications/")
+  },
+  markNotificationRead(id: string) {
+    return request<{ status: string }>(`/notifications/${id}/read`, { method: "PATCH" })
+  },
+  markAllNotificationsRead() {
+    return request<{ status: string }>("/notifications/read-all", { method: "PATCH" })
   },
   getAuthHeaders(): Record<string, string> {
     const token = getAccessToken()

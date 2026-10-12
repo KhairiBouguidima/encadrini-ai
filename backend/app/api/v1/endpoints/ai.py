@@ -63,6 +63,30 @@ async def get_ai_analysis(
             generated_content=None,
         )
 
+    dim_scores = None
+    if analysis.scores.dimension_scores:
+        dim_scores = {
+            "structure": analysis.scores.dimension_scores.structure,
+            "methodology": analysis.scores.dimension_scores.methodology,
+            "language": analysis.scores.dimension_scores.language,
+            "formatting": analysis.scores.dimension_scores.formatting,
+            "citations": analysis.scores.dimension_scores.citations,
+        }
+
+    roadmap_list = [
+        {
+            "id": r.id,
+            "title": r.title,
+            "description": r.description,
+            "priority": r.priority,
+            "dimension": r.dimension,
+            "estimated_gain": r.estimated_gain,
+            "estimated_effort": r.estimated_effort,
+            "completed": r.completed,
+        }
+        for r in getattr(analysis, "roadmap", [])
+    ]
+
     return AIAnalysisResponse(
         status=version.ai_analysis_status.value,
         report_id=str(report.id),
@@ -73,6 +97,9 @@ async def get_ai_analysis(
             "coherence": analysis.scores.coherence,
             "overall_quality": analysis.scores.overall_quality,
         },
+        readiness_score=analysis.scores.readiness_score or analysis.scores.overall_quality,
+        readiness_level=analysis.scores.readiness_level or "Satisfaisant",
+        dimension_scores=dim_scores,
         missing_sections=analysis.missing_sections,
         corrections=[
             {
@@ -87,7 +114,9 @@ async def get_ai_analysis(
             "abstract": analysis.generated_content.abstract,
             "keywords": analysis.generated_content.keywords,
             "jury_questions": analysis.generated_content.jury_questions,
-        }
+            "formatting_issues": getattr(analysis.generated_content, "formatting_issues", []) or getattr(analysis, "formatting_issues", []),
+        },
+        roadmap=roadmap_list,
     )
 
 

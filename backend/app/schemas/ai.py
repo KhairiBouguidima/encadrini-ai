@@ -6,9 +6,13 @@ class AIAnalysisResponse(BaseModel):
     report_id: str
     version_number: int
     scores: Optional[Dict[str, float]] = None
+    readiness_score: Optional[float] = None
+    readiness_level: Optional[str] = None
+    dimension_scores: Optional[Dict[str, float]] = None
     missing_sections: List[str] = []
     corrections: List[Dict[str, Any]] = []
     generated_content: Optional[Dict[str, Any]] = None
+    roadmap: List[Dict[str, Any]] = []
 
 class ChatMessage(BaseModel):
     role: str  # "user" or "assistant"

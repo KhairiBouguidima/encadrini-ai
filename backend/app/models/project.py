@@ -1,12 +1,13 @@
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
-from beanie import Document, Link, PydanticObjectId, Indexed
+from beanie import Document, PydanticObjectId, Indexed
 from pydantic import Field, EmailStr
-from app.models.user import User
 
 class ProjectStatus(str, Enum):
     ACTIVE = "ACTIVE"
+    IN_REVIEW = "IN_REVIEW"
+    COMPLETED = "COMPLETED"
     ARCHIVED = "ARCHIVED"
 
 class Project(Document):
@@ -16,7 +17,12 @@ class Project(Document):
     title: str
     description: str
     status: ProjectStatus = ProjectStatus.ACTIVE
+    progress: int = Field(default=0, ge=0, le=100)
+    deadline: Optional[datetime] = None
+    tags: List[str] = Field(default_factory=list)
+    academic_year: Optional[str] = "2025-2026"
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "projects"

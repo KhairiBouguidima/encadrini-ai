@@ -10,7 +10,17 @@ from app.models.notification import Notification
 
 async def init_db():
     client = AsyncIOMotorClient(settings.MONGODB_URL)
+    db = client[settings.MONGODB_DB_NAME]
+    
+    # Safe migration: ensure reports.project_id is not uniquely constrained
+    try:
+        indexes = await db["reports"].index_information()
+        if "project_id_1" in indexes and indexes["project_id_1"].get("unique"):
+            await db["reports"].drop_index("project_id_1")
+    except Exception as e:
+        print(f"[db-migration] Index check note: {e}")
+
     await init_beanie(
-        database=client[settings.MONGODB_DB_NAME],
+        database=db,
         document_models=[User, Project, Invitation, Report, Annotation, AIAnalysis, Notification]
     )

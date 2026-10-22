@@ -13,7 +13,10 @@ import { ProfilePage } from "./pages/student/ProfilePage"
 import { NotificationsPage } from "./pages/NotificationsPage"
 import { ReportReviewer } from "./pages/supervisor/ReportReviewer"
 import { AIWorkshop } from "./pages/ai-workshop/AIWorkshop"
+import { MockDefensePage } from "./pages/mock-defense/MockDefensePage"
+import { ComplianceCheckerPage } from "./pages/compliance/ComplianceCheckerPage"
 import { AdminDashboard } from "./pages/admin/AdminDashboard"
+import { CertificateVerificationPage } from "./pages/certificates/CertificateVerificationPage"
 import { api, clearSession, getStoredUser, SESSION_EXPIRED_EVENT, type User } from "./lib/api"
 
 type Route =
@@ -30,8 +33,11 @@ type Route =
   | "supervisor-reviewer"
   | "ai-workshop"
   | "admin-dashboard"
+  | "mock-defense"
+  | "compliance"
   | "profile"
   | "notifications"
+  | "verify-certificate"
 
 export default function App() {
   const [user, setUser] = useState<User | null>(() => getStoredUser())
@@ -44,10 +50,14 @@ export default function App() {
   const [invitationToken] = useState(() => {
     return new URLSearchParams(window.location.search).get("invitation_token") ?? ""
   })
+  const [certificateIdParam] = useState(() => {
+    return new URLSearchParams(window.location.search).get("cert_id") ?? ""
+  })
   const [selectedVersion, setSelectedVersion] = useState("1")
   const [selectedReport, setSelectedReport] = useState("")
   const [route, setRoute] = useState<Route>(() => {
     const params = new URLSearchParams(window.location.search)
+    if (params.get("cert_id")) return "verify-certificate"
     if (params.get("confirm_email")) return "email-confirmation"
     if (params.get("reset_token")) return "reset-password"
     if (params.get("invitation_token")) return "invitation"
@@ -57,6 +67,50 @@ export default function App() {
     if (storedUser?.role === "ADMIN") return "admin-dashboard"
     return "landing"
   })
+  const [adminTab, setAdminTab] = useState<"overview" | "users" | "projects">("overview")
+  const [supervisorInitialTab, setSupervisorInitialTab] = useState<"reports" | "meetings" | "certificate">("reports")
+
+  const handleGlobalNavigate = (target: string) => {
+    if (user?.role === "ADMIN") {
+      if (target === "overview" || target === "users" || target === "projects") {
+        setAdminTab(target)
+        setRoute("admin-dashboard")
+        return
+      }
+      if (target === "dashboard") {
+        setAdminTab("overview")
+        setRoute("admin-dashboard")
+        return
+      }
+      if (target === "notifications" || target === "profile") {
+        setRoute(target as any)
+        return
+      }
+    }
+    if (target === "dashboard") {
+      setRoute(user?.role === "ENCADRER" ? "supervisor-reviewer" : user?.role === "ADMIN" ? "admin-dashboard" : "student-dashboard")
+    } else if (target === "workshop") {
+      setRoute("ai-workshop")
+    } else if (target === "reports") {
+      setRoute(user?.role === "STUDENT" ? "student-reports" : "supervisor-reviewer")
+    } else if (target === "mock-defense") {
+      setRoute("mock-defense")
+    } else if (target === "compliance") {
+      setRoute("compliance")
+    } else if (target === "verify-certificate") {
+      setRoute("verify-certificate")
+    } else if (target === "meetings" || target === "certificate") {
+      // meetings & certificate are sub-tabs of the main role dashboard
+      if (user?.role === "ENCADRER") {
+        setSupervisorInitialTab(target as "meetings" | "certificate")
+        setRoute("supervisor-reviewer")
+      } else {
+        setRoute("student-dashboard")
+      }
+    } else {
+      setRoute(target as any)
+    }
+  }
 
   const handleAuthenticated = async (nextUser: User) => {
     setUser(nextUser)
@@ -116,6 +170,12 @@ export default function App() {
         <InvitationPage
           token={invitationToken}
           onAccept={(target) => setRoute(target)}
+          onAccepted={() => {
+            window.history.replaceState({}, "", window.location.pathname)
+            const u = getStoredUser()
+            setUser(u)
+            setRoute(u?.role === "ENCADRER" ? "supervisor-reviewer" : "student-dashboard")
+          }}
         />
       )}
       {route === "email-confirmation" && (
@@ -140,12 +200,7 @@ export default function App() {
             setSelectedVersion(versionId)
             setRoute("ai-workshop")
           }}
-          onNavigate={(target) => {
-            if (target === "dashboard") setRoute("student-dashboard")
-            else if (target === "reports") setRoute("student-reports")
-            else if (target === "workshop") setRoute("ai-workshop")
-            else setRoute(target as any)
-          }}
+          onNavigate={handleGlobalNavigate}
           onExit={handleExit}
           user={user}
         />
@@ -162,12 +217,7 @@ export default function App() {
             setSelectedVersion(versionId)
             setRoute("ai-workshop")
           }}
-          onNavigate={(target) => {
-            if (target === "dashboard") setRoute("student-dashboard")
-            else if (target === "reports") setRoute("student-reports")
-            else if (target === "workshop") setRoute("ai-workshop")
-            else setRoute(target as any)
-          }}
+          onNavigate={handleGlobalNavigate}
           onExit={handleExit}
           user={user}
         />
@@ -176,12 +226,7 @@ export default function App() {
         <ReportVersionDetail
           onBack={() => setRoute("student-dashboard")}
           onOpenWorkshop={() => setRoute("ai-workshop")}
-          onNavigate={(target) => {
-            if (target === "dashboard") setRoute("student-dashboard")
-            else if (target === "reports") setRoute("student-reports")
-            else if (target === "workshop") setRoute("ai-workshop")
-            else setRoute(target as any)
-          }}
+          onNavigate={handleGlobalNavigate}
           onExit={handleExit}
           user={user}
           versionId={selectedVersion}
@@ -189,71 +234,68 @@ export default function App() {
       )}
       {route === "supervisor-reviewer" && (
         <ReportReviewer
-          onNavigate={(target) => {
-            if (target === "reports") setRoute("supervisor-reviewer")
-            else if (target === "workshop") setRoute("ai-workshop")
-            else setRoute(target as any)
-          }}
+          onNavigate={handleGlobalNavigate}
           onExit={handleExit}
           user={user}
+          initialTab={supervisorInitialTab}
+          onTabChange={() => setSupervisorInitialTab("reports")}
         />
       )}
       {route === "ai-workshop" && (
         <AIWorkshop 
-          onNavigate={(target) => {
-            if (target === "dashboard") {
-              setRoute(user?.role === "ENCADRER" ? "supervisor-reviewer" : user?.role === "ADMIN" ? "admin-dashboard" : "student-dashboard")
-            } else if (target === "workshop") {
-              setRoute("ai-workshop")
-            } else {
-              setRoute(target as any)
-            }
-          }}
+          onNavigate={handleGlobalNavigate}
           onExit={handleExit} 
           reportId={selectedReport} 
           versionNumber={Number(selectedVersion)} 
           user={user}
         />
       )}
-      {route === "admin-dashboard" && (
-        <AdminDashboard
-          onNavigate={(target) => {
-            if (target === "overview") setRoute("admin-dashboard")
-            else setRoute(target as any)
-          }}
+      {route === "mock-defense" && (
+        <MockDefensePage
+          onNavigate={handleGlobalNavigate}
           onExit={handleExit}
           user={user}
+        />
+      )}
+      {route === "compliance" && (
+        <ComplianceCheckerPage
+          onNavigate={handleGlobalNavigate}
+          onExit={handleExit}
+          user={user}
+        />
+      )}
+      {route === "admin-dashboard" && (
+        <AdminDashboard
+          onNavigate={handleGlobalNavigate}
+          onExit={handleExit}
+          user={user}
+          initialTab={adminTab}
         />
       )}
       {route === "profile" && (
         <ProfilePage
           user={user}
           onUpdateUser={(updatedUser) => setUser(updatedUser)}
-          onNavigate={(target) => {
-            if (target === "dashboard") {
-              setRoute(user?.role === "ENCADRER" ? "supervisor-reviewer" : user?.role === "ADMIN" ? "admin-dashboard" : "student-dashboard")
-            } else if (target === "workshop") {
-              setRoute("ai-workshop")
-            } else {
-              setRoute(target as any)
-            }
-          }}
+          onNavigate={handleGlobalNavigate}
           onExit={handleExit}
         />
       )}
       {route === "notifications" && (
         <NotificationsPage
           user={user}
-          onNavigate={(target) => {
-            if (target === "dashboard") {
-              setRoute(user?.role === "ENCADRER" ? "supervisor-reviewer" : user?.role === "ADMIN" ? "admin-dashboard" : "student-dashboard")
-            } else if (target === "workshop") {
-              setRoute("ai-workshop")
-            } else {
-              setRoute(target as any)
-            }
-          }}
+          onNavigate={handleGlobalNavigate}
           onExit={handleExit}
+        />
+      )}
+      {route === "verify-certificate" && (
+        <CertificateVerificationPage
+          initialCertId={certificateIdParam}
+          onGoHome={() => {
+            if (user?.role === "STUDENT") setRoute("student-dashboard")
+            else if (user?.role === "ENCADRER") setRoute("supervisor-reviewer")
+            else if (user?.role === "ADMIN") setRoute("admin-dashboard")
+            else setRoute("landing")
+          }}
         />
       )}
     </div>

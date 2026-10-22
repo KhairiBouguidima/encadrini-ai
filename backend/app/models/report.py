@@ -18,6 +18,14 @@ class ReportType(str, Enum):
     FINAL = "FINAL"
     AUTRE = "AUTRE"
 
+class WorkflowStatus(str, Enum):
+    DRAFT = "DRAFT"
+    SUBMITTED = "SUBMITTED"
+    UNDER_REVIEW = "UNDER_REVIEW"
+    CHANGES_REQUESTED = "CHANGES_REQUESTED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
 class ReportVersion(BaseModel):
     version_number: int
     original_file_name: str
@@ -27,6 +35,10 @@ class ReportVersion(BaseModel):
     file_size: int
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     ai_analysis_status: AIAnalysisStatus = AIAnalysisStatus.PENDING
+    workflow_status: WorkflowStatus = WorkflowStatus.SUBMITTED
+    uploaded_by: Optional[PydanticObjectId] = None
+    uploaded_by_name: Optional[str] = None
+    submission_notes: Optional[str] = None
 
 class Report(Document):
     project_id: Indexed(PydanticObjectId)

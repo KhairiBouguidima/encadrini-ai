@@ -11,7 +11,7 @@ PydanticObjectId.__get_pydantic_json_schema__ = _object_id_json_schema
 
 from app.core.config import settings
 from app.core.db import init_db
-from app.api.v1.endpoints import auth, projects, reports, annotations, ai, admin, notifications
+from app.api.v1.endpoints import auth, projects, reports, annotations, ai, admin, notifications, evaluations, mock_defense, compliance, meeting_logs, certificates
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,7 +39,12 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["aut
 app.include_router(projects.router, prefix=f"{settings.API_V1_STR}/projects", tags=["projects"])
 app.include_router(reports.router, prefix=f"{settings.API_V1_STR}/reports", tags=["reports"])
 app.include_router(annotations.router, prefix=f"{settings.API_V1_STR}/annotations", tags=["annotations"])
+app.include_router(evaluations.router, prefix=f"{settings.API_V1_STR}/evaluations", tags=["evaluations"])
 app.include_router(ai.router, prefix=f"{settings.API_V1_STR}/ai", tags=["ai"])
+app.include_router(mock_defense.router, prefix=f"{settings.API_V1_STR}/mock-defense", tags=["mock-defense"])
+app.include_router(compliance.router, prefix=f"{settings.API_V1_STR}/compliance", tags=["compliance"])
+app.include_router(meeting_logs.router, prefix=f"{settings.API_V1_STR}", tags=["meeting-logs"])
+app.include_router(certificates.router, prefix=f"{settings.API_V1_STR}", tags=["certificates"])
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 app.include_router(notifications.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["notifications"])
 

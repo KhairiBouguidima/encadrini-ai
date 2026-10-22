@@ -1,22 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { AppShell, type NavItem } from "../../components/layout/AppShell"
+import { AppShell } from "../../components/layout/AppShell"
 import { Card, Input } from "../../components/ui/Primitives"
 import { Button } from "../../components/ui/Button"
 import { StatusBadge, type BadgeVariant } from "../../components/ui/Badge"
 import { 
   IconReport, IconSparkles, IconUpload, IconChevronRight, 
   IconBell, IconUser, IconPlus, IconDownload, 
-  IconFileText, IconStats, IconSearch 
+  IconFileText, IconStats, IconSearch, IconAward 
 } from "../../components/ui/Icons"
 import { api, type ReportHistory, type User } from "../../lib/api"
-
-const navItems: NavItem[] = [
-  { key: "dashboard", label: "Tableau de bord", icon: <IconStats size={18} /> },
-  { key: "reports", label: "Rapports PFE", icon: <IconReport size={18} /> },
-  { key: "workshop", label: "Atelier IA", icon: <IconSparkles size={18} /> },
-  { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
-  { key: "profile", label: "Mon Profil & Encadreur", icon: <IconUser size={18} /> },
-]
+import { STUDENT_NAV_ITEMS } from "../../lib/navItems"
 
 const REPORT_TYPES = [
   { key: "PFE", label: "Rapport PFE", color: "bg-primary-50 text-primary-700 border-primary-200" },
@@ -179,7 +172,7 @@ export function StudentReportsPage({
 
   return (
     <AppShell
-      navItems={navItems}
+      navItems={STUDENT_NAV_ITEMS}
       activeKey="reports"
       onNavigate={(key) => {
         if (key === "workshop" && reports.length > 0) {

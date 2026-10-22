@@ -5,6 +5,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Encadrini</title>
+    <!-- PDF.js : CDN en priorité, fichier local en fallback -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+            onerror="var s=document.createElement('script');s.src='/pdf.min.js';document.head.appendChild(s);">
+    </script>
+    <!-- JSZip (requis par docx-preview) -->
+    <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+    <!-- docx-preview : rendu Word fidèle à l'original, page par page -->
+    <script src="https://unpkg.com/docx-preview@0.3.4/dist/docx-preview.min.js"></script>
     <!-- figma:head-end -->
   </head>
   <body>

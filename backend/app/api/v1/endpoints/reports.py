@@ -6,7 +6,7 @@ from beanie import PydanticObjectId
 
 from app.models.user import User, UserRole
 from app.models.project import Project
-from app.models.report import Report, ReportVersion, AIAnalysisStatus, ReportType
+from app.models.report import Report, ReportVersion, AIAnalysisStatus, ReportType, WorkflowStatus
 from app.schemas.report import ReportResponse, ReportVersionResponse, ReportCreate
 from app.api.deps import get_current_user, require_role
 from app.storage.storage_service import get_storage_service
@@ -14,13 +14,12 @@ from app.workers.conversion_worker import convert_docx_to_pdf_task
 from app.workers.ai_analysis_worker import run_ai_analysis
 from app.models.notification import NotificationType
 from app.services.notification_service import notify
+from app.api.v1.endpoints.projects import log_project_activity
 
 router = APIRouter()
 
 ALLOWED_MIME_TYPES = [
-    "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/msword"
+    "application/pdf"
 ]
 
 def _to_report_response(report: Report) -> ReportResponse:
@@ -40,7 +39,11 @@ def _to_report_response(report: Report) -> ReportResponse:
                 original_mime_type=v.original_mime_type,
                 file_size=v.file_size,
                 uploaded_at=v.uploaded_at,
-                ai_analysis_status=v.ai_analysis_status
+                ai_analysis_status=v.ai_analysis_status,
+                workflow_status=getattr(v, "workflow_status", WorkflowStatus.SUBMITTED) or WorkflowStatus.SUBMITTED,
+                uploaded_by=str(v.uploaded_by) if getattr(v, "uploaded_by", None) else None,
+                uploaded_by_name=getattr(v, "uploaded_by_name", None),
+                submission_notes=getattr(v, "submission_notes", None)
             ) for v in report.versions
         ],
         created_at=report.created_at,
@@ -50,14 +53,36 @@ def _to_report_response(report: Report) -> ReportResponse:
 async def _get_user_project(user: User, project_id: Optional[str] = None) -> Project:
     if project_id:
         p = await Project.get(PydanticObjectId(project_id))
-        if p and (p.student_id == user.id or p.encadrer_id == user.id or user.role == UserRole.ADMIN):
+        if p and (
+            p.student_id == user.id
+            or getattr(p, "co_student_id", None) == user.id
+            or user.id in getattr(p, "student_ids", [])
+            or p.encadrer_id == user.id
+            or getattr(p, "academic_encadrer_id", None) == user.id
+            or getattr(p, "enterprise_encadrer_id", None) == user.id
+            or user.id in getattr(p, "encadrer_ids", [])
+            or user.role == UserRole.ADMIN
+        ):
             return p
 
     if user.role == UserRole.STUDENT:
-        p = await Project.find_one(Project.student_id == user.id)
+        p = await Project.find_one({
+            "$or": [
+                {"student_id": user.id},
+                {"co_student_id": user.id},
+                {"student_ids": user.id}
+            ]
+        })
     else:
-        p = await Project.find_one(Project.encadrer_id == user.id)
-    
+        p = await Project.find_one({
+            "$or": [
+                {"encadrer_id": user.id},
+                {"academic_encadrer_id": user.id},
+                {"enterprise_encadrer_id": user.id},
+                {"encadrer_ids": user.id}
+            ]
+        })
+
     if not p:
         raise HTTPException(status_code=404, detail="Aucun projet PFE associé trouvé.")
     return p
@@ -118,6 +143,7 @@ async def create_report(
         if ext.lower() in ['docx', 'doc']:
             background_tasks.add_task(convert_docx_to_pdf_task, storage_key)
 
+        uploader_name = f"{current_user.first_name} {current_user.last_name}".strip()
         version_entry = ReportVersion(
             version_number=1,
             original_file_name=file.filename,
@@ -125,23 +151,56 @@ async def create_report(
             raw_file_key=storage_key,
             pdf_file_key=pdf_key,
             file_size=len(content),
-            ai_analysis_status=AIAnalysisStatus.PENDING
+            ai_analysis_status=AIAnalysisStatus.PENDING,
+            workflow_status=WorkflowStatus.SUBMITTED,
+            uploaded_by=current_user.id,
+            uploaded_by_name=uploader_name
         )
         report.versions.append(version_entry)
         report.current_version = 1
         report.updated_at = datetime.now(timezone.utc)
         await report.save()
 
+        # Log project activity
+        log_project_activity(
+            project,
+            current_user,
+            "RAPPORT_DEPOSE",
+            f"Dépôt de la version initiale (v1) de « {report.title} »"
+        )
+        await project.save()
+
         # Trigger AI analysis in background
         background_tasks.add_task(run_ai_analysis, str(report.id), 1)
 
-        # Notify supervisor
-        if project.encadrer_id:
+        # Notify team partner if binome
+        if getattr(project, "co_student_id", None):
+            partner_id = project.co_student_id if project.student_id == current_user.id else project.student_id
             await notify(
-                user_id=project.encadrer_id,
+                user_id=partner_id,
                 notification_type=NotificationType.REPORT_UPLOADED,
-                title="Nouveau Rapport Ajouté",
-                message=f"{current_user.first_name} {current_user.last_name} a ajouté le rapport « {report.title} » (version 1).",
+                title="Nouveau rapport déposé par votre binôme",
+                message=f"{uploader_name} a déposé la version 1 de « {report.title} ».",
+                link=f"/reports/{report.id}/v1"
+            )
+
+        # Notify all supervisors (Academic & Enterprise)
+        supervisor_ids = set()
+        if project.encadrer_id:
+            supervisor_ids.add(project.encadrer_id)
+        if getattr(project, "academic_encadrer_id", None):
+            supervisor_ids.add(project.academic_encadrer_id)
+        if getattr(project, "enterprise_encadrer_id", None):
+            supervisor_ids.add(project.enterprise_encadrer_id)
+        for sid in getattr(project, "encadrer_ids", []) or []:
+            supervisor_ids.add(sid)
+
+        for sid in supervisor_ids:
+            await notify(
+                user_id=sid,
+                notification_type=NotificationType.REPORT_UPLOADED,
+                title="Nouveau Rapport à Évaluer",
+                message=f"{uploader_name} a ajouté le rapport « {report.title} » (version 1).",
                 link=f"/reports/{report.id}/v1"
             )
 
@@ -153,6 +212,7 @@ async def upload_version_to_report(
     report_id: PydanticObjectId,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    submission_notes: Optional[str] = Form(None),
     current_user: User = Depends(require_role([UserRole.STUDENT]))
 ):
     if file.content_type not in ALLOWED_MIME_TYPES and not file.filename.endswith(('.pdf', '.docx', '.doc')):
@@ -179,6 +239,7 @@ async def upload_version_to_report(
     if ext.lower() in ['docx', 'doc']:
         background_tasks.add_task(convert_docx_to_pdf_task, storage_key)
 
+    uploader_name = f"{current_user.first_name} {current_user.last_name}".strip()
     version_entry = ReportVersion(
         version_number=next_version,
         original_file_name=file.filename,
@@ -186,7 +247,11 @@ async def upload_version_to_report(
         raw_file_key=storage_key,
         pdf_file_key=pdf_key,
         file_size=len(content),
-        ai_analysis_status=AIAnalysisStatus.PENDING
+        ai_analysis_status=AIAnalysisStatus.PENDING,
+        workflow_status=WorkflowStatus.SUBMITTED,
+        uploaded_by=current_user.id,
+        uploaded_by_name=uploader_name,
+        submission_notes=submission_notes
     )
 
     report.versions.append(version_entry)
@@ -194,16 +259,46 @@ async def upload_version_to_report(
     report.updated_at = datetime.now(timezone.utc)
     await report.save()
 
+    # Log project activity
+    log_project_activity(
+        project,
+        current_user,
+        "NOUVELLE_VERSION",
+        f"Nouvelle version v{next_version} de « {report.title} » déposée par {uploader_name}"
+    )
+    await project.save()
+
     # Trigger AI analysis
     background_tasks.add_task(run_ai_analysis, str(report.id), next_version)
 
-    # Notify supervisor
-    if project.encadrer_id:
+    # Notify teammate if binôme
+    if getattr(project, "co_student_id", None):
+        partner_id = project.co_student_id if project.student_id == current_user.id else project.student_id
         await notify(
-            user_id=project.encadrer_id,
+            user_id=partner_id,
             notification_type=NotificationType.REPORT_UPLOADED,
-            title="Nouvelle Version de Rapport",
-            message=f"{current_user.first_name} {current_user.last_name} a déposé la version {next_version} de « {report.title} ».",
+            title="Nouvelle version déposée par votre binôme",
+            message=f"{uploader_name} a déposé la version {next_version} de « {report.title} ».",
+            link=f"/reports/{report.id}/v{next_version}"
+        )
+
+    # Notify all supervisors (Academic & Enterprise)
+    supervisor_ids = set()
+    if project.encadrer_id:
+        supervisor_ids.add(project.encadrer_id)
+    if getattr(project, "academic_encadrer_id", None):
+        supervisor_ids.add(project.academic_encadrer_id)
+    if getattr(project, "enterprise_encadrer_id", None):
+        supervisor_ids.add(project.enterprise_encadrer_id)
+    for sid in getattr(project, "encadrer_ids", []) or []:
+        supervisor_ids.add(sid)
+
+    for sid in supervisor_ids:
+        await notify(
+            user_id=sid,
+            notification_type=NotificationType.REPORT_UPLOADED,
+            title="Nouvelle Version de Rapport à Réviser",
+            message=f"{uploader_name} a déposé la version {next_version} de « {report.title} ».",
             link=f"/reports/{report.id}/v{next_version}"
         )
 
@@ -214,11 +309,11 @@ async def upload_version_to_report(
 async def upload_report_version(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    submission_notes: Optional[str] = Form(None),
     current_user: User = Depends(require_role([UserRole.STUDENT]))
 ):
     project = await _get_user_project(current_user)
 
-    # Find the most recently updated report, or create a default one
     report = await Report.find(Report.project_id == project.id).sort("-updated_at").first_or_none()
     if not report:
         report = Report(
@@ -230,7 +325,7 @@ async def upload_report_version(
         )
         await report.insert()
 
-    return await upload_version_to_report(report.id, background_tasks, file, current_user)
+    return await upload_version_to_report(report.id, background_tasks, file, submission_notes, current_user)
 
 # ── 5. Backward-compatible history route ────────────────────────
 @router.get("/history", response_model=ReportResponse)
@@ -243,7 +338,6 @@ async def get_report_history(
     if report_id:
         report = await Report.get(PydanticObjectId(report_id))
     else:
-        # Default to the most active/recent report
         report = await Report.find(Report.project_id == project.id).sort("-updated_at").first_or_none()
 
     if not report:
@@ -262,11 +356,18 @@ async def get_report(
         raise HTTPException(status_code=404, detail="Rapport non trouvé.")
 
     project = await Project.get(report.project_id)
-    if not project or (
-        project.student_id != current_user.id
-        and project.encadrer_id != current_user.id
-        and current_user.role != UserRole.ADMIN
-    ):
+    is_student = project and (
+        project.student_id == current_user.id
+        or getattr(project, "co_student_id", None) == current_user.id
+        or current_user.id in getattr(project, "student_ids", [])
+    )
+    is_supervisor = project and (
+        project.encadrer_id == current_user.id
+        or getattr(project, "academic_encadrer_id", None) == current_user.id
+        or getattr(project, "enterprise_encadrer_id", None) == current_user.id
+        or current_user.id in getattr(project, "encadrer_ids", [])
+    )
+    if not project or (not is_student and not is_supervisor and current_user.role != UserRole.ADMIN):
         raise HTTPException(status_code=403, detail="Accès non autorisé à ce rapport.")
 
     return _to_report_response(report)
@@ -312,7 +413,11 @@ async def delete_report(
         raise HTTPException(status_code=404, detail="Rapport non trouvé.")
 
     project = await Project.get(report.project_id)
-    if not project or (project.student_id != current_user.id and current_user.role != UserRole.ADMIN):
+    is_student = project and (
+        project.student_id == current_user.id
+        or getattr(project, "co_student_id", None) == current_user.id
+    )
+    if not project or (not is_student and current_user.role != UserRole.ADMIN):
         raise HTTPException(status_code=403, detail="Opération non autorisée.")
 
     await report.delete()

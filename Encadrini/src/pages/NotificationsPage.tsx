@@ -1,9 +1,19 @@
-import { useEffect, useState } from "react"
-import { AppShell, type NavItem } from "../components/layout/AppShell"
+import { useEffect, useMemo, useState } from "react"
+import { AppShell } from "../components/layout/AppShell"
 import { Card } from "../components/ui/Primitives"
 import { Button } from "../components/ui/Button"
-import { IconBell, IconCheck, IconReport, IconSparkles, IconUser } from "../components/ui/Icons"
+import {
+  IconBell,
+  IconCheck,
+  IconReport,
+  IconSparkles,
+  IconUser,
+  IconStats,
+  IconStudent,
+  IconAward,
+} from "../components/ui/Icons"
 import { api, type User } from "../lib/api"
+import { getNavItems } from "../lib/navItems"
 
 interface NotificationItem {
   id: string
@@ -14,13 +24,6 @@ interface NotificationItem {
   link?: string
   created_at: string
 }
-
-const navItems: NavItem[] = [
-  { key: "dashboard", label: "Tableau de bord", icon: <IconReport size={18} /> },
-  { key: "workshop", label: "Atelier IA", icon: <IconSparkles size={18} /> },
-  { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
-  { key: "profile", label: "Mon Profil & Encadreur", icon: <IconUser size={18} /> },
-]
 
 function formatDate(iso: string) {
   try {
@@ -49,7 +52,14 @@ export function NotificationsPage({
   const [isLoading, setIsLoading] = useState(true)
 
   const userName = user ? `${user.first_name} ${user.last_name}` : "Utilisateur"
-  const userRole = user?.role === "ENCADRER" ? "Encadreur" : user?.role === "ADMIN" ? "Administrateur" : "Étudiant"
+  const userRole =
+    user?.role === "ENCADRER"
+      ? "Encadreur"
+      : user?.role === "ADMIN"
+      ? "Administrateur plateforme"
+      : "Étudiant"
+
+  const navItems = useMemo(() => getNavItems(user?.role), [user?.role])
 
   useEffect(() => {
     let isMounted = true
@@ -66,25 +76,47 @@ export function NotificationsPage({
       } catch {
         if (!isMounted) return
         // Sample fallback if no backend notifications
-        setNotifications([
-          {
-            id: "1",
-            type: "AI_ANALYSIS_COMPLETED",
-            title: "Analyse IA terminée",
-            message: "L'analyse IA de votre version v3 est prête avec un score global de 86/100.",
-            is_read: false,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "2",
-            type: "INVITATION_ACCEPTED",
-            title: "Invitation acceptée",
-            message: "Votre encadreur a accepté l'invitation à suivre votre PFE.",
-            is_read: true,
-            created_at: new Date(Date.now() - 86400000).toISOString(),
-          },
-        ])
-        setUnreadCount(1)
+        if (user.role === "ADMIN") {
+          setNotifications([
+            {
+              id: "admin-1",
+              type: "SYSTEM_INFO",
+              title: "Système opérationnel",
+              message: "La plateforme Encadrini AI est active et connectée à MongoDB.",
+              is_read: true,
+              created_at: new Date().toISOString(),
+            },
+            {
+              id: "admin-2",
+              type: "AI_ANALYSIS_COMPLETED",
+              title: "Moteur IA actif",
+              message: "Le service d'analyse et d'annotation IA est prêt.",
+              is_read: true,
+              created_at: new Date(Date.now() - 3600000).toISOString(),
+            },
+          ])
+          setUnreadCount(0)
+        } else {
+          setNotifications([
+            {
+              id: "1",
+              type: "AI_ANALYSIS_COMPLETED",
+              title: "Analyse IA terminée",
+              message: "L'analyse IA de votre version v3 est prête avec un score global de 86/100.",
+              is_read: false,
+              created_at: new Date().toISOString(),
+            },
+            {
+              id: "2",
+              type: "INVITATION_ACCEPTED",
+              title: "Invitation acceptée",
+              message: "Votre encadreur a accepté l'invitation à suivre votre PFE.",
+              is_read: true,
+              created_at: new Date(Date.now() - 86400000).toISOString(),
+            },
+          ])
+          setUnreadCount(1)
+        }
       } finally {
         if (isMounted) setIsLoading(false)
       }

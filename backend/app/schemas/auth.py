@@ -92,6 +92,8 @@ class UserResponse(BaseModel):
     role: UserRole
     is_active: bool
     openai_api_key: Optional[str] = None
+    subscription_plan: Optional[str] = "FREE"
+    monthly_simulations_count: Optional[int] = 0
 
 class TokenResponse(BaseModel):
     access_token: str

@@ -1,16 +1,10 @@
-import { useEffect, useRef, useState } from "react"
-import { AppShell, type NavItem } from "../../components/layout/AppShell"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { AppShell } from "../../components/layout/AppShell"
 import { Card } from "../../components/ui/Primitives"
 import { Button } from "../../components/ui/Button"
-import { IconReport, IconSparkles, IconSend, IconCheck, IconBell, IconUser } from "../../components/ui/Icons"
+import { IconReport, IconSparkles, IconSend, IconCheck, IconBell, IconUser, IconAward, IconStats, IconStudent } from "../../components/ui/Icons"
 import { api, type AIAnalysisResponse, type User } from "../../lib/api"
-
-const navItems: NavItem[] = [
-  { key: "dashboard", label: "Tableau de bord", icon: <IconReport size={18} /> },
-  { key: "workshop", label: "Atelier IA", icon: <IconSparkles size={18} /> },
-  { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
-  { key: "profile", label: "Mon Profil & Encadreur", icon: <IconUser size={18} /> },
-]
+import { getNavItems } from "../../lib/navItems"
 
 type Tab = "analyse" | "chat" | "checker"
 type ChatMsg = { role: "user" | "assistant"; content: string }
@@ -64,6 +58,8 @@ export function AIWorkshop({
 
   const userName = user ? `${user.first_name} ${user.last_name}` : "Utilisateur"
   const userRole = user?.role === "ENCADRER" ? "Encadreur" : user?.role === "ADMIN" ? "Administrateur" : "Etudiant"
+
+  const navItems = useMemo(() => getNavItems(user?.role), [user?.role])
 
   useEffect(() => {
     let isMounted = true

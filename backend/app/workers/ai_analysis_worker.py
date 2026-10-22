@@ -86,15 +86,22 @@ async def run_ai_analysis(report_id: str, version_number: int):
         # Notify project stakeholders
         project = await Project.get(report.project_id)
         if project:
-            for uid in [project.student_id, project.encadrer_id]:
-                if uid:
-                    await notify(
-                        user_id=uid,
-                        notification_type=NotificationType.AI_ANALYSIS_COMPLETED,
-                        title="AI Analysis Complete",
-                        message=f"AI analysis for report v{version_number} is ready. Overall quality: {scores.overall_quality}/100",
-                        link=f"/reports/{report_id}/v{version_number}/analysis",
-                    )
+            recipients = set()
+            if project.student_id:
+                recipients.add(project.student_id)
+            if project.encadrer_id:
+                recipients.add(project.encadrer_id)
+            for eid in getattr(project, "encadrer_ids", []) or []:
+                recipients.add(eid)
+
+            for uid in recipients:
+                await notify(
+                    user_id=uid,
+                    notification_type=NotificationType.AI_ANALYSIS_COMPLETED,
+                    title="AI Analysis Complete",
+                    message=f"AI analysis for report v{version_number} is ready. Overall quality: {scores.overall_quality}/100",
+                    link=f"/reports/{report_id}/v{version_number}/analysis",
+                )
 
     except Exception as e:
         print(f"AI analysis failed for report {report_id} v{version_number}: {e}")
@@ -104,15 +111,22 @@ async def run_ai_analysis(report_id: str, version_number: int):
         # Notify project stakeholders of failure
         project = await Project.get(report.project_id)
         if project:
-            for uid in [project.student_id, project.encadrer_id]:
-                if uid:
-                    await notify(
-                        user_id=uid,
-                        notification_type=NotificationType.AI_ANALYSIS_FAILED,
-                        title="AI Analysis Failed",
-                        message=f"AI analysis for report v{version_number} encountered an error. Please retry.",
-                        link=f"/reports/{report_id}/v{version_number}",
-                    )
+            recipients = set()
+            if project.student_id:
+                recipients.add(project.student_id)
+            if project.encadrer_id:
+                recipients.add(project.encadrer_id)
+            for eid in getattr(project, "encadrer_ids", []) or []:
+                recipients.add(eid)
+
+            for uid in recipients:
+                await notify(
+                    user_id=uid,
+                    notification_type=NotificationType.AI_ANALYSIS_FAILED,
+                    title="AI Analysis Failed",
+                    message=f"AI analysis for report v{version_number} encountered an error. Please retry.",
+                    link=f"/reports/{report_id}/v{version_number}",
+                )
 
 
 def _extract_text(file_bytes: bytes, mime_type: str) -> str:

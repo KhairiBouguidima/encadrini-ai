@@ -17,43 +17,114 @@ from app.schemas.auth import (
 )
 from app.api.deps import get_current_user
 
+def _to_user_response(user: User) -> UserResponse:
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        faculty=user.faculty,
+        gender=user.gender,
+        phone_number=user.phone_number,
+        role=user.role,
+        is_active=user.is_active,
+        openai_api_key=user.openai_api_key,
+        subscription_plan=getattr(user, "subscription_plan", "FREE") or "FREE",
+        monthly_simulations_count=getattr(user, "monthly_simulations_count", 0) or 0
+    )
+
 router = APIRouter()
 
 async def check_and_link_pending_invitations(user: User):
-    if user.role != UserRole.ENCADRER:
-        return
     normalized_email = user.email.strip().lower()
-    from app.models.project import Project, Invitation, InvitationStatus
+    from app.models.project import Project, Invitation, InvitationStatus, InvitationType, SupervisorRole
     from app.models.notification import NotificationType
     from app.services.notification_service import notify
+    from app.api.v1.endpoints.projects import log_project_activity
 
     pending_invitations = await Invitation.find(
         Invitation.encadrer_email == normalized_email,
-        Invitation.status == InvitationStatus.PENDING
+        Invitation.status == InvitationStatus.PENDING,
+        Invitation.expires_at > datetime.now(timezone.utc)
     ).to_list()
 
     for inv in pending_invitations:
         project = await Project.get(inv.project_id)
-        if project:
-            project.encadrer_id = user.id
+        if not project:
+            continue
+
+        inv_type = getattr(inv, "invitation_type", InvitationType.SUPERVISOR)
+
+        # 1. Student Binôme Invitation
+        if inv_type == InvitationType.BINOME and user.role == UserRole.STUDENT:
+            if not getattr(project, "co_student_id", None):
+                project.co_student_id = user.id
+                if not hasattr(project, "student_ids") or project.student_ids is None:
+                    project.student_ids = [project.student_id]
+                if user.id not in project.student_ids:
+                    project.student_ids.append(user.id)
+                log_project_activity(
+                    project,
+                    user,
+                    "BINOME_REJOINT",
+                    f"{user.first_name} {user.last_name} a rejoint le projet en binôme à la connexion"
+                )
+                project.updated_at = datetime.now(timezone.utc)
+                await project.save()
+
+                inv.status = InvitationStatus.ACCEPTED
+                await inv.save()
+
+                partner_name = f"{user.first_name} {user.last_name}".strip()
+                await notify(
+                    user_id=project.student_id,
+                    notification_type=NotificationType.BINOME_INVITATION_ACCEPTED,
+                    title="Binôme connecté !",
+                    message=f"{partner_name} s'est connecté(e) et a rejoint votre projet PFE « {project.title} ».",
+                    link="/dashboard"
+                )
+
+        # 2. Supervisor Invitation
+        elif (inv_type == InvitationType.SUPERVISOR or inv_type is None) and user.role == UserRole.ENCADRER:
+            sup_role = getattr(inv, "supervisor_role", SupervisorRole.ACADEMIC) or SupervisorRole.ACADEMIC
+            if sup_role == SupervisorRole.ENTERPRISE:
+                project.enterprise_encadrer_id = user.id
+            else:
+                project.academic_encadrer_id = user.id
+                if not project.encadrer_id:
+                    project.encadrer_id = user.id
+
             if not hasattr(project, "encadrer_ids") or project.encadrer_ids is None:
                 project.encadrer_ids = []
             if user.id not in project.encadrer_ids:
                 project.encadrer_ids.append(user.id)
+
+            role_label = "Encadreur Académique" if sup_role == SupervisorRole.ACADEMIC else "Encadreur Entreprise"
+            log_project_activity(
+                project,
+                user,
+                "SUPERVISEUR_ASSIGNE",
+                f"{user.first_name} {user.last_name} est assigné(e) en tant qu'{role_label}"
+            )
             project.updated_at = datetime.now(timezone.utc)
             await project.save()
 
             inv.status = InvitationStatus.ACCEPTED
             await inv.save()
 
-            encadrer_name = f"{user.first_name} {user.last_name}"
-            await notify(
-                user_id=project.student_id,
-                notification_type=NotificationType.INVITATION_ACCEPTED,
-                title="Encadreur connecté",
-                message=f"{encadrer_name} ({user.email}) est connecté(e) et supervise désormais votre projet PFE.",
-                link="/projects/me"
-            )
+            encadrer_name = f"{user.first_name} {user.last_name}".strip()
+            # Notify students
+            s_ids = [project.student_id]
+            if getattr(project, "co_student_id", None):
+                s_ids.append(project.co_student_id)
+            for sid in s_ids:
+                await notify(
+                    user_id=sid,
+                    notification_type=NotificationType.INVITATION_ACCEPTED,
+                    title="Encadreur connecté",
+                    message=f"{encadrer_name} ({user.email}) est connecté(e) en tant qu'{role_label} sur votre projet PFE.",
+                    link="/dashboard"
+                )
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(user_in: UserRegister, background_tasks: BackgroundTasks):
@@ -85,7 +156,7 @@ async def register(user_in: UserRegister, background_tasks: BackgroundTasks):
     )
     await user.insert()
 
-    if user.role == UserRole.ENCADRER:
+    if user.role in [UserRole.ENCADRER, UserRole.STUDENT]:
         await check_and_link_pending_invitations(user)
 
     if not is_auto_active:
@@ -102,18 +173,7 @@ async def register(user_in: UserRegister, background_tasks: BackgroundTasks):
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        user=UserResponse(
-            id=str(user.id),
-            email=user.email,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            faculty=user.faculty,
-            gender=user.gender,
-            phone_number=user.phone_number,
-            role=user.role,
-            is_active=user.is_active,
-            openai_api_key=user.openai_api_key
-        )
+        user=_to_user_response(user)
     )
 
 @router.post("/login", response_model=TokenResponse)
@@ -138,7 +198,7 @@ async def login(credentials: UserLogin):
                 detail="Veuillez confirmer votre adresse email avant de vous connecter."
             )
 
-    if user.role == UserRole.ENCADRER:
+    if user.role in [UserRole.ENCADRER, UserRole.STUDENT]:
         await check_and_link_pending_invitations(user)
         
     access_token = create_access_token(user.id)
@@ -147,18 +207,7 @@ async def login(credentials: UserLogin):
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        user=UserResponse(
-            id=str(user.id),
-            email=user.email,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            faculty=user.faculty,
-            gender=user.gender,
-            phone_number=user.phone_number,
-            role=user.role,
-            is_active=user.is_active,
-            openai_api_key=user.openai_api_key
-        )
+        user=_to_user_response(user)
     )
 
 @router.get("/confirm-email", response_model=MessageResponse)
@@ -224,18 +273,7 @@ async def resend_confirmation(request: ResendConfirmationRequest, background_tas
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
-    return UserResponse(
-        id=str(current_user.id),
-        email=current_user.email,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        faculty=current_user.faculty,
-        gender=current_user.gender,
-        phone_number=current_user.phone_number,
-        role=current_user.role,
-        is_active=current_user.is_active,
-        openai_api_key=current_user.openai_api_key
-    )
+    return _to_user_response(current_user)
 
 @router.put("/me", response_model=UserResponse)
 async def update_me(
@@ -249,18 +287,7 @@ async def update_me(
         
     await current_user.save()
     
-    return UserResponse(
-        id=str(current_user.id),
-        email=current_user.email,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        faculty=current_user.faculty,
-        gender=current_user.gender,
-        phone_number=current_user.phone_number,
-        role=current_user.role,
-        is_active=current_user.is_active,
-        openai_api_key=current_user.openai_api_key
-    )
+    return _to_user_response(current_user)
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(request: RefreshTokenRequest):
@@ -286,18 +313,7 @@ async def refresh_token(request: RefreshTokenRequest):
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token_new,
-            user=UserResponse(
-                id=str(user.id),
-                email=user.email,
-                first_name=user.first_name,
-                last_name=user.last_name,
-                faculty=user.faculty,
-                gender=user.gender,
-                phone_number=user.phone_number,
-                role=user.role,
-                is_active=user.is_active,
-                openai_api_key=user.openai_api_key
-            )
+            user=_to_user_response(user)
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")

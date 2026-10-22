@@ -25,6 +25,10 @@ class User(Document):
     password_reset_token_hash: Optional[str] = None
     password_reset_expires_at: Optional[datetime] = None
     openai_api_key: Optional[str] = None
+    subscription_plan: str = "FREE"  # "FREE" | "PREMIUM"
+    subscription_expires_at: Optional[datetime] = None
+    monthly_simulations_count: int = 0
+    last_simulation_reset_at: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:

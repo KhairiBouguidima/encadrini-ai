@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from app.models.report import AIAnalysisStatus, ReportType
+from app.models.report import AIAnalysisStatus, ReportType, WorkflowStatus
 
 class ReportCreate(BaseModel):
     title: str = Field(..., min_length=2, max_length=150)
@@ -20,6 +20,10 @@ class ReportVersionResponse(BaseModel):
     file_size: int
     uploaded_at: datetime
     ai_analysis_status: AIAnalysisStatus
+    workflow_status: WorkflowStatus = WorkflowStatus.SUBMITTED
+    uploaded_by: Optional[str] = None
+    uploaded_by_name: Optional[str] = None
+    submission_notes: Optional[str] = None
 
 class ReportResponse(BaseModel):
     id: str

@@ -46,15 +46,23 @@ async def run_ai_analysis(report_id: str, version_number: int):
         raw_result = await provider.analyze_report(text_content)
 
         # 3. Validate & persist structured analysis
+        raw_scores = raw_result.get("scores", {})
+        dim_data = raw_scores.get("dimension_scores")
+        from app.models.ai_analysis import DimensionScores, RoadmapItem
+        dim_scores = DimensionScores(**dim_data) if dim_data else None
+
         scores = AnalysisScores(
-            linguistic=raw_result["scores"]["linguistic"],
-            structural=raw_result["scores"]["structural"],
-            coherence=raw_result["scores"]["coherence"],
-            overall_quality=_compute_score(
-                raw_result["scores"]["linguistic"],
-                raw_result["scores"]["structural"],
-                raw_result["scores"]["coherence"]
-            )
+            linguistic=raw_scores.get("linguistic", 85.0),
+            structural=raw_scores.get("structural", 85.0),
+            coherence=raw_scores.get("coherence", 85.0),
+            overall_quality=raw_scores.get("overall_quality") or _compute_score(
+                raw_scores.get("linguistic", 85.0),
+                raw_scores.get("structural", 85.0),
+                raw_scores.get("coherence", 85.0)
+            ),
+            readiness_score=raw_scores.get("readiness_score"),
+            readiness_level=raw_scores.get("readiness_level"),
+            dimension_scores=dim_scores
         )
 
         corrections = [
@@ -66,8 +74,13 @@ async def run_ai_analysis(report_id: str, version_number: int):
             summary=gen.get("summary", ""),
             abstract=gen.get("abstract", ""),
             keywords=gen.get("keywords", []),
-            jury_questions=gen.get("jury_questions", [])
+            jury_questions=gen.get("jury_questions", []),
+            formatting_issues=gen.get("formatting_issues", [])
         )
+
+        roadmap_items = [
+            RoadmapItem(**r) for r in raw_result.get("roadmap", [])
+        ]
 
         analysis = AIAnalysis(
             report_id=report.id,
@@ -75,7 +88,9 @@ async def run_ai_analysis(report_id: str, version_number: int):
             scores=scores,
             missing_sections=raw_result.get("missing_sections", []),
             corrections=corrections,
-            generated_content=generated_content
+            generated_content=generated_content,
+            roadmap=roadmap_items,
+            formatting_issues=gen.get("formatting_issues", [])
         )
         await analysis.insert()
 

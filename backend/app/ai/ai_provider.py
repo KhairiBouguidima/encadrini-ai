@@ -68,48 +68,59 @@ def _generate_dynamic_analysis(text_content: str) -> Dict[str, Any]:
     word_count = len(words)
 
     # 1. Structural Analysis (25% weight)
-    has_cover = bool(re.search(r'\b(projet de fin d.etudes|pfe|rapport de stage|encadrant|universite|faculte)\b', clean_text, re.I))
-    has_abstract = bool(re.search(r'\b(resume|abstract|mots.cles|keywords)\b', clean_text, re.I))
-    has_intro = bool(re.search(r'\b(introduction|contexte|problematique|problématique)\b', clean_text, re.I))
-    has_state_art = bool(re.search(r'\b(etat de l.art|état de l.art|revue de la litterature|analyse de l.existant|solutions existantes)\b', clean_text, re.I))
-    has_methodo = bool(re.search(r'\b(methodologie|méthodologie|scrum|agile|cycle en v|analyse des besoins|spécification|conception|architecture)\b', clean_text, re.I))
-    has_realization = bool(re.search(r'\b(realisation|réalisation|implementation|implémentation|technologies|tests|résultats|resultats)\b', clean_text, re.I))
-    has_conclusion = bool(re.search(r'\b(conclusion|perspectives)\b', clean_text, re.I))
-    has_biblio = bool(re.search(r'\b(bibliographie|references|références|webographie)\b', clean_text, re.I))
+    has_cover = bool(re.search(r'\b(projet de fin d.etudes|pfe|rapport de stage|encadrant|universite|faculte|iset|licence|master|ingenieur|ingénieur|ministère|republique|république)\b', clean_text, re.I))
+    has_abstract = bool(re.search(r'\b(resume|résumé|abstract|mots.cles|keywords|sommaire|table des matieres|table des matières|liste des figures|liste des tableaux)\b', clean_text, re.I))
+    has_intro = bool(re.search(r'\b(introduction|contexte|problematique|problématique|objectifs)\b', clean_text, re.I))
+    has_state_art = bool(re.search(r'\b(etat de l.art|état de l.art|revue de la litterature|revue de la littérature|analyse de l.existant|solutions existantes|etudes? de projet|étude de l.existant)\b', clean_text, re.I))
+    has_methodo = bool(re.search(r'\b(methodologie|méthodologie|scrum|agile|cycle en v|analyse des besoins|spécification|conception|architecture|sprint)\b', clean_text, re.I))
+    has_realization = bool(re.search(r'\b(realisation|réalisation|implementation|implémentation|technologies|tests|résultats|resultats|outils|environnement)\b', clean_text, re.I))
+    has_conclusion = bool(re.search(r'\b(conclusion|perspectives|bilan)\b', clean_text, re.I))
+    has_biblio = bool(re.search(r'\b(bibliographie|references|références|webographie|sources|documentation technique)\b', clean_text, re.I))
 
-    structure_score = 40.0
-    if has_cover: structure_score += 8.0
-    if has_abstract: structure_score += 8.0
-    if has_intro: structure_score += 10.0
-    if has_state_art: structure_score += 10.0
-    if has_methodo: structure_score += 10.0
+    structure_score = 45.0
+    if has_cover: structure_score += 7.0
+    if has_abstract: structure_score += 7.0
+    if has_intro: structure_score += 8.0
+    if has_state_art: structure_score += 8.0
+    if has_methodo: structure_score += 8.0
     if has_realization: structure_score += 8.0
     if has_conclusion: structure_score += 8.0
-    if has_biblio: structure_score += 8.0
-    structure_score = min(98.0, max(35.0, structure_score))
+    if has_biblio: structure_score += 7.0
+    if word_count > 3000: structure_score += 4.0
+    structure_score = min(99.0, max(40.0, structure_score))
 
     # 2. Methodology Analysis (25% weight)
-    has_problem = bool(re.search(r'\b(problematique|problématique|defis|challenges|objectifs)\b', clean_text, re.I))
-    has_choices = bool(re.search(r'\b(justification|choix technique|comparatif|pourquoi|avantages)\b', clean_text, re.I))
-    has_eval = bool(re.search(r'\b(validation|evaluation|expérimentation|performances|metriques)\b', clean_text, re.I))
+    has_problem = bool(re.search(r'\b(problematique|problématique|defis|challenges|objectifs|besoins)\b', clean_text, re.I))
+    has_choices = bool(re.search(r'\b(justification|choix technique|comparatif|pourquoi|avantages|cahier des charges|diagramme)\b', clean_text, re.I))
+    has_eval = bool(re.search(r'\b(validation|evaluation|évaluation|expérimentation|performances|metriques|métriques|tests|ci/cd|qualité)\b', clean_text, re.I))
 
-    methodo_score = 45.0
-    if has_problem: methodo_score += 18.0
-    if has_choices: methodo_score += 18.0
+    methodo_score = 55.0
+    if has_problem: methodo_score += 15.0
+    if has_choices: methodo_score += 15.0
     if has_eval: methodo_score += 14.0
-    methodo_score = min(95.0, max(40.0, methodo_score))
+    if word_count > 3000: methodo_score += 3.0
+    methodo_score = min(99.0, max(45.0, methodo_score))
 
     # 3. Language Quality (20% weight)
-    has_informal = bool(re.search(r'\b(je|on|notre équipe|moi)\b', clean_text, re.I))
-    language_score = 82.0 if word_count > 150 else 70.0
-    if has_informal: language_score -= 8.0
+    informal_matches = len(re.findall(r'\b(moi|notre équipe)\b', clean_text, re.I))
+    has_informal = informal_matches > 5
+    language_score = 96.0 if word_count > 2000 else (90.0 if word_count > 300 else 75.0)
+    if has_informal:
+        language_score -= 5.0
 
     # 4. Formatting (15% weight)
-    formatting_score = 80.0 if (has_cover and has_abstract) else 68.0
+    has_figures_tables = bool(re.search(r'\b(figure|tableau)\b', clean_text, re.I))
+    formatting_score = 75.0
+    if has_cover: formatting_score += 8.0
+    if has_abstract: formatting_score += 8.0
+    if has_figures_tables: formatting_score += 8.0
+    formatting_score = min(98.0, formatting_score)
 
     # 5. Citations & Bibliography (15% weight)
-    has_ieee_apa = bool(re.search(r'(\[\d+\]|\(\w+,\s*\d{4}\))', clean_text))
-    citations_score = 85.0 if (has_biblio and has_ieee_apa) else (60.0 if has_biblio else 40.0)
+    has_citation_format = bool(re.search(r'(\[\d+\]|\(\w+,\s*\d{4}\)|https?://|www\.|isbn|doi|vol\.|n°)', clean_text, re.I))
+    has_formal_biblio = bool(re.search(r'\b(bibliographie|webographie|références bibliographiques)\b', clean_text, re.I))
+    has_ieee_apa = bool(has_formal_biblio and has_citation_format)
+    citations_score = 95.0 if has_ieee_apa else (92.0 if has_biblio else 65.0)
 
     # Calculate overall Readiness Score (0-100) per PFE Guide formula
     readiness_score = round(
@@ -120,6 +131,9 @@ def _generate_dynamic_analysis(text_content: str) -> Dict[str, Any]:
         (citations_score * 0.15),
         1
     )
+
+    # Deterministic weighted quality score
+    overall_quality = round(0.30 * language_score + 0.35 * structure_score + 0.35 * methodo_score, 2)
 
     # Determine Readiness Level
     if readiness_score >= 90.0:
@@ -271,7 +285,7 @@ def _generate_dynamic_analysis(text_content: str) -> Dict[str, Any]:
             "linguistic": language_score,
             "structural": structure_score,
             "coherence": methodo_score,
-            "overall_quality": readiness_score,
+            "overall_quality": overall_quality,
             "readiness_score": readiness_score,
             "readiness_level": readiness_level,
             "dimension_scores": {

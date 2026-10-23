@@ -390,15 +390,31 @@ async def get_platform_stats(
     total_annotations = await Annotation.find_all().count()
     total_ai_analyses = await AIAnalysis.find_all().count()
 
-    # Compute average AI quality score
+    # Compute average AI quality score (based on the latest version of each report)
     avg_quality = None
     if total_ai_analyses > 0:
         pipeline = [
-            {"$group": {"_id": None, "avg_quality": {"$avg": "$scores.overall_quality"}}}
+            {"$sort": {"version_number": -1}},
+            {"$group": {
+                "_id": "$report_id",
+                "latest_quality": {"$first": "$scores.overall_quality"}
+            }},
+            {"$group": {
+                "_id": None,
+                "avg_quality": {"$avg": "$latest_quality"}
+            }}
         ]
         result = await AIAnalysis.aggregate(pipeline).to_list()
-        if result:
+        if result and result[0].get("avg_quality") is not None:
             avg_quality = round(result[0]["avg_quality"], 2)
+        else:
+            # Fallback to general average if needed
+            fallback_pipeline = [
+                {"$group": {"_id": None, "avg_quality": {"$avg": "$scores.overall_quality"}}}
+            ]
+            fallback_res = await AIAnalysis.aggregate(fallback_pipeline).to_list()
+            if fallback_res and fallback_res[0].get("avg_quality") is not None:
+                avg_quality = round(fallback_res[0]["avg_quality"], 2)
 
     return PlatformStats(
         total_users=total_users,

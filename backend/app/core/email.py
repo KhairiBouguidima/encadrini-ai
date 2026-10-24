@@ -4,6 +4,30 @@ from email.message import EmailMessage
 from app.core.config import settings
 
 
+def _send_smtp_message(message: EmailMessage, email_type: str, to_email: str) -> bool:
+    if not settings.SMTP_HOST:
+        return False
+
+    try:
+        if settings.SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
+                if settings.SMTP_USERNAME:
+                    smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                smtp.send_message(message)
+        else:
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
+                if settings.SMTP_USE_TLS:
+                    smtp.starttls()
+                if settings.SMTP_USERNAME:
+                    smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                smtp.send_message(message)
+        print(f"[{email_type}] Successfully sent email to {to_email}", flush=True)
+        return True
+    except Exception as e:
+        print(f"[{email_type}] SMTP sending error to {to_email}: {e}", flush=True)
+        return False
+
+
 def build_email_confirmation_link(token: str) -> str:
     separator = "&" if "?" in settings.FRONTEND_URL else "?"
     return f"{settings.FRONTEND_URL}{separator}confirm_email={token}"
@@ -13,7 +37,7 @@ def send_email_confirmation(to_email: str, first_name: str, token: str) -> None:
     confirmation_link = build_email_confirmation_link(token)
 
     if not settings.SMTP_HOST:
-        print(f"[email-confirmation] Send this link to {to_email}: {confirmation_link}")
+        print(f"[email-confirmation] No SMTP_HOST configured. Send this link to {to_email}: {confirmation_link}", flush=True)
         return
 
     message = EmailMessage()
@@ -33,22 +57,19 @@ def send_email_confirmation(to_email: str, first_name: str, token: str) -> None:
         )
     )
 
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as smtp:
-        if settings.SMTP_USE_TLS:
-            smtp.starttls()
-        if settings.SMTP_USERNAME:
-            smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        smtp.send_message(message)
+    _send_smtp_message(message, "email-confirmation", to_email)
+
 
 def build_password_reset_link(token: str) -> str:
     separator = "&" if "?" in settings.FRONTEND_URL else "?"
     return f"{settings.FRONTEND_URL}{separator}reset_token={token}"
 
+
 def send_password_reset_email(to_email: str, first_name: str, token: str) -> None:
     reset_link = build_password_reset_link(token)
 
     if not settings.SMTP_HOST:
-        print(f"[password-reset] Send this link to {to_email}: {reset_link}", flush=True)
+        print(f"[password-reset] No SMTP_HOST configured. Send this link to {to_email}: {reset_link}", flush=True)
         return
 
     message = EmailMessage()
@@ -70,22 +91,19 @@ def send_password_reset_email(to_email: str, first_name: str, token: str) -> Non
         )
     )
 
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as smtp:
-        if settings.SMTP_USE_TLS:
-            smtp.starttls()
-        if settings.SMTP_USERNAME:
-            smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        smtp.send_message(message)
+    _send_smtp_message(message, "password-reset", to_email)
+
 
 def build_invitation_link(token: str) -> str:
     separator = "&" if "?" in settings.FRONTEND_URL else "?"
     return f"{settings.FRONTEND_URL}{separator}invitation_token={token}"
 
+
 def send_supervisor_invitation_email(to_email: str, student_name: str, project_title: str, token: str) -> bool:
     invitation_link = build_invitation_link(token)
 
     if not settings.SMTP_HOST:
-        print(f"[supervisor-invitation] Send this link to {to_email}: {invitation_link}", flush=True)
+        print(f"[supervisor-invitation] No SMTP_HOST configured. Send this link to {to_email}: {invitation_link}", flush=True)
         return False
 
     message = EmailMessage()
@@ -109,15 +127,4 @@ def send_supervisor_invitation_email(to_email: str, student_name: str, project_t
         )
     )
 
-    try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as smtp:
-            if settings.SMTP_USE_TLS:
-                smtp.starttls()
-            if settings.SMTP_USERNAME:
-                smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-            smtp.send_message(message)
-        return True
-    except Exception as e:
-        print(f"[email] Failed to send invitation email to {to_email}: {e}", flush=True)
-        return False
-
+    return _send_smtp_message(message, "supervisor-invitation", to_email)

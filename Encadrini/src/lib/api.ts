@@ -321,7 +321,7 @@ export interface PlatformStats {
   ai_analysis_avg_quality: number | null
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://encadrini-ai.onrender.com/api/v1"
 const ACCESS_TOKEN_KEY = "encadrini_access_token"
 const REFRESH_TOKEN_KEY = "encadrini_refresh_token"
 const USER_KEY = "encadrini_user"

@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd Encadrini && npm install && npm run build",
+  "outputDirectory": "Encadrini/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

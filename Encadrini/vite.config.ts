@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 import path from "node:path"
 
 export default defineConfig({
-  base: "/encadrini-ai/",
+  base: process.env.VITE_BASE_PATH || "/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

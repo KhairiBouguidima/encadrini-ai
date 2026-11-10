@@ -38,10 +38,10 @@ class Settings(BaseSettings):
     BREVO_API_KEY: str = ""
     EMAIL_FROM: str = "Encadrini <onboarding@resend.dev>"
 
-    SMTP_HOST: str = ""
+    SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USERNAME: str = ""
-    SMTP_PASSWORD: str = ""
+    SMTP_USERNAME: str = "encadriniai@gmail.com"
+    SMTP_PASSWORD: str = "usdqzwaswcvmzyzz"
     SMTP_FROM_EMAIL: str = "no-reply@encadrini.local"
     SMTP_USE_TLS: bool = True
 

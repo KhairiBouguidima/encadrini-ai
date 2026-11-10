@@ -112,9 +112,23 @@ def _send_email_transport(to_email: str, subject: str, html_content: str, text_c
     return False
 
 
+def _build_frontend_query_link(query_param: str, token: str) -> str:
+    base = (settings.FRONTEND_URL or "https://encadrini-ai.vercel.app").rstrip("/")
+    if "?" in base:
+        return f"{base}&{query_param}={token}"
+    return f"{base}/?{query_param}={token}"
+
+
 def build_email_confirmation_link(token: str) -> str:
-    separator = "&" if "?" in settings.FRONTEND_URL else "?"
-    return f"{settings.FRONTEND_URL}{separator}confirm_email={token}"
+    return _build_frontend_query_link("confirm_email", token)
+
+
+def build_password_reset_link(token: str) -> str:
+    return _build_frontend_query_link("reset_token", token)
+
+
+def build_invitation_link(token: str) -> str:
+    return _build_frontend_query_link("invitation_token", token)
 
 
 def _build_html_email(
@@ -332,11 +346,6 @@ Plateforme Académique & Suivi PFE
     return _send_email_transport(to_email, subject, html_content, text_content, "email-confirmation")
 
 
-def build_password_reset_link(token: str) -> str:
-    separator = "&" if "?" in settings.FRONTEND_URL else "?"
-    return f"{settings.FRONTEND_URL}{separator}reset_token={token}"
-
-
 def send_password_reset_email(to_email: str, first_name: str, token: str) -> bool:
     reset_link = build_password_reset_link(token)
     subject = "Réinitialisation de votre mot de passe • Encadrini"
@@ -374,11 +383,6 @@ Plateforme Académique & Suivi PFE
 
     print(f"[password-reset] Reset link for {to_email}: {reset_link}", flush=True)
     return _send_email_transport(to_email, subject, html_content, text_content, "password-reset")
-
-
-def build_invitation_link(token: str) -> str:
-    separator = "&" if "?" in settings.FRONTEND_URL else "?"
-    return f"{settings.FRONTEND_URL}{separator}invitation_token={token}"
 
 
 def send_supervisor_invitation_email(to_email: str, student_name: str, project_title: str, token: str) -> bool:
@@ -436,3 +440,60 @@ Plateforme Académique & Suivi PFE
 
     print(f"[supervisor-invitation] Invitation link for {to_email}: {invitation_link}", flush=True)
     return _send_email_transport(to_email, subject, html_content, text_content, "supervisor-invitation")
+
+
+def send_binome_invitation_email(to_email: str, student_name: str, project_title: str, token: str) -> bool:
+    invitation_link = build_invitation_link(token)
+    subject = f"Invitation à former une équipe binôme : {project_title} • Encadrini"
+
+    body_paragraphs = [
+        f"L'étudiant(e) <strong>{student_name}</strong> vous invite à former une équipe en binôme pour son projet de fin d'études sur la plateforme <strong>Encadrini</strong>.",
+        "En acceptant cette invitation, vous collaborerez directement sur le même espace de travail, partagerez le suivi des jalons clés, les dépôts de livrables et les simulations de soutenance.",
+    ]
+
+    detail_box = f"""
+    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #2563eb; margin-bottom: 4px;">
+      Projet de fin d'études (Binôme)
+    </div>
+    <div style="font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.4;">
+      « {project_title} »
+    </div>
+    <div style="font-size: 13px; color: #64748b; margin-top: 6px;">
+      Étudiant(e) initiateur(trice) : <strong>{student_name}</strong>
+    </div>
+    """
+
+    html_content = _build_html_email(
+        badge_label="Collaboration Étudiante",
+        headline="Invitation à former un binôme PFE",
+        greeting="Bonjour,",
+        body_paragraphs=body_paragraphs,
+        cta_label="Rejoindre le projet en binôme",
+        cta_url=invitation_link,
+        detail_box=detail_box,
+        expiry_notice="Cette invitation est valable pendant <strong>7 jours</strong>.",
+        security_notice="Si cette invitation ne vous concerne pas ou si vous faites déjà partie d'un autre projet, vous pouvez simplement l'ignorer.",
+    )
+
+    text_content = f"""Bonjour,
+
+L'étudiant(e) {student_name} vous invite à former une équipe en binôme pour son projet de fin d'études (PFE) sur la plateforme Encadrini.
+
+Projet : « {project_title} »
+Étudiant(e) : {student_name}
+
+En acceptant cette invitation, vous collaborerez directement sur le même espace de travail et partagerez les livrables ainsi que le calendrier du projet.
+
+Pour accepter cette invitation et rejoindre l'équipe, veuillez cliquer sur le lien suivant :
+{invitation_link}
+
+Validité : Ce lien d'invitation reste valide pendant 7 jours.
+Si vous n'êtes pas concerné(e), vous pouvez ignorer cet email.
+
+Cordialement,
+L'équipe Encadrini
+Plateforme Académique & Suivi PFE
+"""
+
+    print(f"[binome-invitation] Invitation link for {to_email}: {invitation_link}", flush=True)
+    return _send_email_transport(to_email, subject, html_content, text_content, "binome-invitation")

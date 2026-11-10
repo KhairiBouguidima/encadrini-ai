@@ -7,7 +7,7 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token
-from app.core.email import send_email_confirmation
+from app.core.email import send_email_confirmation, send_password_reset_email
 from app.models.user import User, UserRole
 from app.schemas.auth import (
     UserRegister, UserLogin, TokenResponse, UserResponse, 
@@ -307,8 +307,6 @@ async def refresh_token(request: RefreshTokenRequest):
 
 @router.post("/forgot-password", response_model=MessageResponse)
 async def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
-    from app.core.email import send_password_reset_email
-
     normalized_email = request.email.strip().lower()
     user = await User.find_one(User.email == normalized_email)
     if not user:

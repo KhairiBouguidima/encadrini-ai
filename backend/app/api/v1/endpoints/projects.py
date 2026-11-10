@@ -2,7 +2,7 @@ import secrets
 import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, BackgroundTasks
 from beanie import PydanticObjectId
 
 from app.models.user import User, UserRole
@@ -19,7 +19,7 @@ from app.schemas.project import (
 from app.api.deps import get_current_user, require_role
 from app.models.notification import NotificationType
 from app.services.notification_service import notify
-from app.core.email import send_supervisor_invitation_email, build_invitation_link
+from app.core.email import send_supervisor_invitation_email, send_binome_invitation_email, build_invitation_link
 
 router = APIRouter()
 
@@ -358,6 +358,7 @@ async def update_my_project(
 @router.post("/binome/invite", response_model=InvitationResponse)
 async def invite_binome(
     invite_in: InviteBinomeRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_role([UserRole.STUDENT]))
 ):
     project = await Project.find_one({
@@ -451,6 +452,15 @@ async def invite_binome(
             message=f"{student_name} vous a invité(e) à faire équipe en binôme sur son projet : « {project.title} ».",
             link=f"/?invitation_token={raw_token}"
         )
+
+    # Dispatch email invitation in background
+    background_tasks.add_task(
+        send_binome_invitation_email,
+        normalized_email,
+        student_name,
+        project.title,
+        raw_token,
+    )
 
     log_project_activity(
         project,
@@ -680,6 +690,7 @@ async def decline_binome_invitation(
 @router.post("/invite", response_model=InvitationResponse)
 async def invite_encadrer(
     invite_in: InviteEncadrerRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_role([UserRole.STUDENT]))
 ):
     project = await Project.find_one({
@@ -776,7 +787,8 @@ async def invite_encadrer(
             link=f"/?invitation_token={raw_token}"
         )
 
-    send_supervisor_invitation_email(
+    background_tasks.add_task(
+        send_supervisor_invitation_email,
         normalized_email,
         student_name,
         f"{project.title} ({role_title})",

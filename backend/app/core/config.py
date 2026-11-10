@@ -35,7 +35,13 @@ class Settings(BaseSettings):
 
     REQUIRE_EMAIL_CONFIRMATION: bool = True
 
-    # SMTP Configuration (loaded from .env)
+    # Email Service Providers (Loaded strictly from .env)
+    # Resend HTTPS API bypasses Render Free tier SMTP port blocking (ports 25, 465, 587)
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "Encadrini <onboarding@resend.dev>"
+    BREVO_API_KEY: str = ""
+
+    # SMTP Configuration (Loaded strictly from .env)
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USERNAME: str = ""

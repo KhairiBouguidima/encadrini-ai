@@ -1,50 +1,115 @@
 import smtplib
 from email.message import EmailMessage
+import requests
 
 from app.core.config import settings
 
 
 def _send_email_transport(to_email: str, subject: str, html_content: str, text_content: str, email_type: str = "email") -> bool:
     """
-    Sends an email using standard SMTP (Port 465 SSL or Port 587 STARTTLS)
-    configured via environment variables in .env.
+    Sends an email using Resend (HTTPS 443), Brevo (HTTPS 443), or SMTP (465/587).
+    All credentials are read strictly from environment variables (.env).
+    
+    HTTPS APIs (Resend/Brevo) bypass Render Free tier restrictions because
+    Render Free blocks outbound TCP connections on SMTP ports (25, 465, 587).
     """
-    if not settings.SMTP_HOST:
-        print(f"[{email_type}] Notice: SMTP_HOST is not configured in .env. Email for {to_email} skipped.", flush=True)
-        return False
+    # 1. Resend HTTP API (Port 443 - Works seamlessly on Render free tier)
+    if settings.RESEND_API_KEY:
+        try:
+            api_key = settings.RESEND_API_KEY.strip().strip('"\'')
+            from_addr = settings.RESEND_FROM_EMAIL.strip() if settings.RESEND_FROM_EMAIL else "Encadrini <onboarding@resend.dev>"
+            res = requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": from_addr,
+                    "to": [to_email],
+                    "subject": subject,
+                    "html": html_content,
+                    "text": text_content,
+                },
+                timeout=12,
+            )
+            if res.status_code in [200, 201]:
+                print(f"[{email_type}] Successfully delivered email via Resend HTTPS to {to_email}", flush=True)
+                return True
+            else:
+                print(f"[{email_type}] Resend API error ({res.status_code}): {res.text}", flush=True)
+        except Exception as e:
+            print(f"[{email_type}] Resend request exception: {e}", flush=True)
 
-    try:
-        message = EmailMessage()
-        message["Subject"] = subject
+    # 2. Brevo HTTP API (Port 443 - Works seamlessly on Render free tier)
+    if settings.BREVO_API_KEY:
+        try:
+            sender_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME or "contact@encadrini.com"
+            res = requests.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "api-key": settings.BREVO_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "sender": {"name": "Encadrini", "email": sender_email},
+                    "to": [{"email": to_email}],
+                    "subject": subject,
+                    "htmlContent": html_content,
+                    "textContent": text_content,
+                },
+                timeout=12,
+            )
+            if res.status_code in [200, 201]:
+                print(f"[{email_type}] Successfully delivered email via Brevo HTTPS to {to_email}", flush=True)
+                return True
+            else:
+                print(f"[{email_type}] Brevo API error ({res.status_code}): {res.text}", flush=True)
+        except Exception as e:
+            print(f"[{email_type}] Brevo request exception: {e}", flush=True)
 
-        from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME
-        if from_email and "<" not in from_email:
-            message["From"] = f"Encadrini <{from_email}>"
-        else:
-            message["From"] = from_email
+    # 3. Standard SMTP (Port 465 SSL or Port 587 STARTTLS)
+    if settings.SMTP_HOST:
+        try:
+            message = EmailMessage()
+            message["Subject"] = subject
 
-        message["To"] = to_email
-        message.set_content(text_content)
-        message.add_alternative(html_content, subtype="html")
+            from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME
+            if from_email and "<" not in from_email:
+                message["From"] = f"Encadrini <{from_email}>"
+            else:
+                message["From"] = from_email
 
-        if settings.SMTP_PORT == 465:
-            with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as smtp:
-                if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
-                    smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-                smtp.send_message(message)
-        else:
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as smtp:
-                if settings.SMTP_USE_TLS:
-                    smtp.starttls()
-                if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
-                    smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-                smtp.send_message(message)
+            message["To"] = to_email
+            message.set_content(text_content)
+            message.add_alternative(html_content, subtype="html")
 
-        print(f"[{email_type}] Successfully delivered email via SMTP to {to_email}", flush=True)
-        return True
-    except Exception as e:
-        print(f"[{email_type}] SMTP error sending email to {to_email}: {e}", flush=True)
-        return False
+            if settings.SMTP_PORT == 465:
+                with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as smtp:
+                    if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
+                        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                    smtp.send_message(message)
+            else:
+                with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as smtp:
+                    if settings.SMTP_USE_TLS:
+                        smtp.starttls()
+                    if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
+                        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                    smtp.send_message(message)
+
+            print(f"[{email_type}] Successfully delivered email via SMTP to {to_email}", flush=True)
+            return True
+        except Exception as e:
+            print(
+                f"[{email_type}] SMTP error sending email to {to_email}: {e} "
+                f"(If running on Render Free tier, outbound SMTP ports 25, 465, 587 are blocked by Render. "
+                f"Set RESEND_API_KEY or BREVO_API_KEY in your .env / Render environment variables to send via HTTPS port 443).",
+                flush=True
+            )
+            return False
+
+    print(f"[{email_type}] Notice: No email provider configured in .env (set RESEND_API_KEY, BREVO_API_KEY, or SMTP_HOST). Email for {to_email} skipped.", flush=True)
+    return False
 
 
 def build_email_confirmation_link(token: str) -> str:

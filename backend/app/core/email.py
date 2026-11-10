@@ -41,14 +41,19 @@ def _send_email_transport(to_email: str, subject: str, html_content: str, text_c
         except Exception as e:
             print(f"[{email_type}] Resend request exception: {e}", flush=True)
 
-    # 2. Brevo HTTP API (Port 443 - Works seamlessly on Render free tier)
+    # 2. Brevo HTTP API (Port 443 - Works seamlessly on Render free tier, sends to any recipient)
     if settings.BREVO_API_KEY:
         try:
-            sender_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME or "contact@encadrini.com"
+            api_key = settings.BREVO_API_KEY.strip().strip('"\'')
+            raw_sender = settings.BREVO_FROM_EMAIL or settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME or "contact@encadrini.com"
+            import re
+            sender_match = re.search(r'[\w\.-]+@[\w\.-]+', raw_sender)
+            sender_email = sender_match.group(0) if sender_match else "contact@encadrini.com"
+
             res = requests.post(
                 "https://api.brevo.com/v3/smtp/email",
                 headers={
-                    "api-key": settings.BREVO_API_KEY,
+                    "api-key": api_key,
                     "Content-Type": "application/json",
                 },
                 json={

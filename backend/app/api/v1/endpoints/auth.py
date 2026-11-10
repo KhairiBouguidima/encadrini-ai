@@ -136,7 +136,7 @@ async def register(user_in: UserRegister, background_tasks: BackgroundTasks):
             detail="Un compte avec cette adresse email existe déjà."
         )
 
-    is_auto_active = not bool(settings.SMTP_HOST)
+    requires_confirmation = settings.REQUIRE_EMAIL_CONFIRMATION
     confirmation_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(confirmation_token.encode()).hexdigest()
 
@@ -149,17 +149,17 @@ async def register(user_in: UserRegister, background_tasks: BackgroundTasks):
         gender=user_in.gender.strip() if user_in.gender else "",
         phone_number=user_in.phone_number.strip() if user_in.phone_number else "",
         role=user_in.role,
-        is_active=True if is_auto_active else False,
-        email_confirm_token_hash=None if is_auto_active else token_hash,
-        email_confirm_expires_at=None if is_auto_active else (datetime.now(timezone.utc) + timedelta(hours=24)),
-        email_confirmed_at=datetime.now(timezone.utc) if is_auto_active else None,
+        is_active=False if requires_confirmation else True,
+        email_confirm_token_hash=token_hash if requires_confirmation else None,
+        email_confirm_expires_at=(datetime.now(timezone.utc) + timedelta(hours=24)) if requires_confirmation else None,
+        email_confirmed_at=None if requires_confirmation else datetime.now(timezone.utc),
     )
     await user.insert()
 
     if user.role in [UserRole.ENCADRER, UserRole.STUDENT]:
         await check_and_link_pending_invitations(user)
 
-    if not is_auto_active:
+    if requires_confirmation:
         background_tasks.add_task(
             send_email_confirmation,
             user.email,
@@ -187,16 +187,10 @@ async def login(credentials: UserLogin):
         )
     
     if not user.is_active:
-        # If no SMTP is configured, auto-activate user to prevent lockout
-        if not settings.SMTP_HOST:
-            user.is_active = True
-            user.email_confirmed_at = datetime.now(timezone.utc)
-            await user.save()
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Veuillez confirmer votre adresse email avant de vous connecter."
-            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Veuillez confirmer votre adresse email avant de vous connecter. Vérifiez votre boîte de réception ou demandez un nouvel email."
+        )
 
     if user.role in [UserRole.ENCADRER, UserRole.STUDENT]:
         await check_and_link_pending_invitations(user)
@@ -244,15 +238,6 @@ async def resend_confirmation(request: ResendConfirmationRequest, background_tas
 
     if not user or user.is_active:
         return MessageResponse(message=generic_msg)
-
-    if not settings.SMTP_HOST:
-        # Auto-activate when SMTP is not configured (dev mode)
-        user.is_active = True
-        user.email_confirmed_at = datetime.now(timezone.utc)
-        user.email_confirm_token_hash = None
-        user.email_confirm_expires_at = None
-        await user.save()
-        return MessageResponse(message="Compte activé automatiquement (mode développement).")
 
     # Generate a new confirmation token
     new_token = secrets.token_urlsafe(32)

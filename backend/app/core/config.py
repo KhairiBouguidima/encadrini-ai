@@ -12,13 +12,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     FRONTEND_URL: str = "https://encadrini-ai.vercel.app"
-    CORS_ORIGINS: list[str] = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://encadrini-ai.vercel.app",
-    ]
+    CORS_ORIGINS: list[str] = [ "https://encadrini-ai.vercel.app" ]
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -38,6 +32,11 @@ class Settings(BaseSettings):
 
     AI_PROVIDER: str = "openai"
     OPENAI_API_KEY: str = "sk-fake-key-for-dev"
+
+    REQUIRE_EMAIL_CONFIRMATION: bool = True
+    RESEND_API_KEY: str = ""
+    BREVO_API_KEY: str = ""
+    EMAIL_FROM: str = "Encadrini <onboarding@resend.dev>"
 
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

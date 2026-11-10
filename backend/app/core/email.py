@@ -1,100 +1,50 @@
 import smtplib
 from email.message import EmailMessage
-import requests
 
 from app.core.config import settings
 
 
 def _send_email_transport(to_email: str, subject: str, html_content: str, text_content: str, email_type: str = "email") -> bool:
     """
-    Sends an email using Resend (HTTPS 443), Brevo (HTTPS 443), or SMTP (465/587).
-    HTTPS APIs (Resend/Brevo) are strongly recommended because Render Free tier blocks
-    outbound SMTP ports (25, 465, 587).
+    Sends an email using standard SMTP (Port 465 SSL or Port 587 STARTTLS)
+    configured via environment variables in .env.
     """
-    # 1. Resend HTTP API (Port 443 - Works seamlessly on Render free tier)
-    if settings.RESEND_API_KEY:
-        try:
-            from_addr = settings.EMAIL_FROM or "Encadrini <onboarding@resend.dev>"
-            res = requests.post(
-                "https://api.resend.com/emails",
-                headers={
-                    "Authorization": f"Bearer {settings.RESEND_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "from": from_addr,
-                    "to": [to_email],
-                    "subject": subject,
-                    "html": html_content,
-                    "text": text_content,
-                },
-                timeout=12,
-            )
-            if res.status_code in [200, 201]:
-                print(f"[{email_type}] Successfully delivered email via Resend to {to_email}", flush=True)
-                return True
-            else:
-                print(f"[{email_type}] Resend API error ({res.status_code}): {res.text}", flush=True)
-        except Exception as e:
-            print(f"[{email_type}] Resend request exception: {e}", flush=True)
+    if not settings.SMTP_HOST:
+        print(f"[{email_type}] Notice: SMTP_HOST is not configured in .env. Email for {to_email} skipped.", flush=True)
+        return False
 
-    # 2. Brevo HTTP API (Port 443 - Works seamlessly on Render free tier)
-    if settings.BREVO_API_KEY:
-        try:
-            sender_email = settings.SMTP_FROM_EMAIL if "@" in settings.SMTP_FROM_EMAIL and "local" not in settings.SMTP_FROM_EMAIL else "contact@encadrini.com"
-            res = requests.post(
-                "https://api.brevo.com/v3/smtp/email",
-                headers={
-                    "api-key": settings.BREVO_API_KEY,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "sender": {"name": "Encadrini", "email": sender_email},
-                    "to": [{"email": to_email}],
-                    "subject": subject,
-                    "htmlContent": html_content,
-                    "textContent": text_content,
-                },
-                timeout=12,
-            )
-            if res.status_code in [200, 201]:
-                print(f"[{email_type}] Successfully delivered email via Brevo to {to_email}", flush=True)
-                return True
-            else:
-                print(f"[{email_type}] Brevo API error ({res.status_code}): {res.text}", flush=True)
-        except Exception as e:
-            print(f"[{email_type}] Brevo request exception: {e}", flush=True)
+    try:
+        message = EmailMessage()
+        message["Subject"] = subject
 
-    # 3. Standard SMTP (Port 465 SSL or Port 587 TLS)
-    if settings.SMTP_HOST:
-        try:
-            message = EmailMessage()
-            message["Subject"] = subject
-            message["From"] = settings.SMTP_FROM_EMAIL
-            message["To"] = to_email
-            message.set_content(text_content)
-            message.add_alternative(html_content, subtype="html")
+        from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME
+        if from_email and "<" not in from_email:
+            message["From"] = f"Encadrini <{from_email}>"
+        else:
+            message["From"] = from_email
 
-            if settings.SMTP_PORT == 465:
-                with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as smtp:
-                    if settings.SMTP_USERNAME:
-                        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-                    smtp.send_message(message)
-            else:
-                with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as smtp:
-                    if settings.SMTP_USE_TLS:
-                        smtp.starttls()
-                    if settings.SMTP_USERNAME:
-                        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-                    smtp.send_message(message)
-            print(f"[{email_type}] Successfully delivered email via SMTP to {to_email}", flush=True)
-            return True
-        except Exception as e:
-            print(f"[{email_type}] SMTP error to {to_email}: {e} (Note: Render Free tier blocks ports 25, 465, 587. Configure RESEND_API_KEY to send emails via HTTPS)", flush=True)
+        message["To"] = to_email
+        message.set_content(text_content)
+        message.add_alternative(html_content, subtype="html")
 
-    # 4. Fallback log for development / debugging
-    print(f"[{email_type}] Notice: No mail provider configured or active. Email for {to_email} skipped.", flush=True)
-    return False
+        if settings.SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as smtp:
+                if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
+                    smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                smtp.send_message(message)
+        else:
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as smtp:
+                if settings.SMTP_USE_TLS:
+                    smtp.starttls()
+                if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
+                    smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                smtp.send_message(message)
+
+        print(f"[{email_type}] Successfully delivered email via SMTP to {to_email}", flush=True)
+        return True
+    except Exception as e:
+        print(f"[{email_type}] SMTP error sending email to {to_email}: {e}", flush=True)
+        return False
 
 
 def build_email_confirmation_link(token: str) -> str:
@@ -102,56 +52,215 @@ def build_email_confirmation_link(token: str) -> str:
     return f"{settings.FRONTEND_URL}{separator}confirm_email={token}"
 
 
+def _build_html_email(
+    badge_label: str,
+    headline: str,
+    greeting: str,
+    body_paragraphs: list[str],
+    cta_label: str,
+    cta_url: str,
+    detail_box: str | None = None,
+    expiry_notice: str | None = None,
+    security_notice: str | None = None,
+) -> str:
+    """
+    Constructs a modern, responsive, and bulletproof HTML email template
+    compatible with all major email clients (Outlook, Gmail, Apple Mail, etc.).
+    """
+    paragraphs_html = "".join(
+        f'<p style="margin: 0 0 16px; font-size: 15px; line-height: 1.65; color: #334155;">{p}</p>'
+        for p in body_paragraphs
+    )
+
+    detail_box_html = ""
+    if detail_box:
+        detail_box_html = f"""
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; border-radius: 8px; padding: 16px 20px; margin: 24px 0;">
+            {detail_box}
+        </div>
+        """
+
+    expiry_html = ""
+    if expiry_notice:
+        expiry_html = f"""
+        <div style="display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; color: #64748b; line-height: 1.5;">
+            <strong style="color: #475569; margin-right: 6px;">⏱ Validité :</strong> {expiry_notice}
+        </div>
+        """
+
+    security_html = ""
+    if security_notice:
+        security_html = f"""
+        <div style="font-size: 13px; color: #64748b; line-height: 1.5;">
+            <strong style="color: #475569; margin-right: 6px;">🔒 Sécurité :</strong> {security_notice}
+        </div>
+        """
+
+    return f"""<!DOCTYPE html>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{headline}</title>
+  <style type="text/css">
+    body, table, td, a {{ -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }}
+    table, td {{ mso-table-lspace: 0pt; mso-table-rspace: 0pt; }}
+    img {{ -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }}
+    body {{ margin: 0; padding: 0; width: 100% !important; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
+    .cta-button:hover {{ background-color: #1d4ed8 !important; }}
+    @media screen and (max-width: 600px) {{
+      .email-container {{ width: 100% !important; padding: 12px !important; }}
+      .content-card {{ padding: 24px 18px !important; }}
+    }}
+  </style>
+</head>
+<body style="margin: 0; padding: 32px 0; background-color: #f1f5f9; -webkit-font-smoothing: antialiased;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td align="center">
+        <!-- Wrapper container -->
+        <table border="0" cellpadding="0" cellspacing="0" width="580" class="email-container" style="max-width: 580px; width: 100%;">
+          
+          <!-- Brand Header -->
+          <tr>
+            <td align="center" style="padding-bottom: 24px;">
+              <table border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <span style="font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: #1e3a8a; text-decoration: none; display: inline-block;">
+                      Encadrini<span style="color: #2563eb;">.ai</span>
+                    </span>
+                    <div style="font-size: 12px; color: #64748b; font-weight: 500; letter-spacing: 0.3px; margin-top: 4px; text-transform: uppercase;">
+                      Plateforme d'Encadrement Académique & Suivi PFE
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Content Card -->
+          <tr>
+            <td class="content-card" style="background-color: #ffffff; border-radius: 12px; padding: 36px 36px 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);">
+              
+              <!-- Badge -->
+              <div style="margin-bottom: 16px;">
+                <span style="display: inline-block; background-color: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; padding: 4px 12px; border-radius: 9999px; border: 1px solid #dbeafe;">
+                  {badge_label}
+                </span>
+              </div>
+
+              <!-- Headline & Greeting -->
+              <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.35;">
+                {headline}
+              </h1>
+
+              <p style="margin: 0 0 16px; font-size: 15px; font-weight: 600; color: #1e293b;">
+                {greeting}
+              </p>
+
+              <!-- Body paragraphs -->
+              {paragraphs_html}
+
+              <!-- Detail / highlight box if applicable -->
+              {detail_box_html}
+
+              <!-- Bulletproof Call-To-Action Button -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 28px 0 24px;">
+                <tr>
+                  <td align="center">
+                    <table border="0" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" bgcolor="#2563eb" style="border-radius: 8px;">
+                          <a href="{cta_url}" target="_blank" class="cta-button" style="display: inline-block; padding: 14px 34px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 600; color: #ffffff !important; text-decoration: none; border-radius: 8px; background-color: #2563eb; letter-spacing: 0.2px;">
+                            {cta_label}
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Alternative URL box -->
+              <div style="background-color: #f8fafc; border: 1px solid #f1f5f9; border-radius: 6px; padding: 12px 14px; margin-top: 24px; word-break: break-all;">
+                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">
+                  Si le bouton ne fonctionne pas, copiez et collez l'URL suivante dans votre navigateur :
+                </div>
+                <a href="{cta_url}" target="_blank" style="font-size: 12px; color: #2563eb; text-decoration: underline; word-break: break-all;">
+                  {cta_url}
+                </a>
+              </div>
+
+              <!-- Notice & Security Box -->
+              <div style="border-top: 1px solid #f1f5f9; margin-top: 28px; padding-top: 20px;">
+                {expiry_html}
+                {security_html}
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Professional Footer -->
+          <tr>
+            <td align="center" style="padding-top: 24px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="font-size: 12px; color: #94a3b8; line-height: 1.6;">
+                    <p style="margin: 0 0 6px;">
+                      © 2026 <strong>Encadrini</strong> • Plateforme d'Encadrement et de Suivi de Projets de Fin d'Études.
+                    </p>
+                    <p style="margin: 0 0 6px;">
+                      Cet email est confidentiel et a été envoyé automatiquement. Merci de ne pas y répondre directement.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
 def send_email_confirmation(to_email: str, first_name: str, token: str) -> bool:
     confirmation_link = build_email_confirmation_link(token)
-    subject = "Confirmez votre adresse email - Encadrini"
+    subject = "Confirmation de votre compte • Encadrini"
+
+    body_paragraphs = [
+        "Nous vous remercions pour votre inscription sur <strong>Encadrini</strong>, la solution dédiée à l'accompagnement, au suivi et à la réussite des projets de fin d'études.",
+        "Afin de finaliser l'ouverture de votre compte et de débloquer l'ensemble de vos fonctionnalités, veuillez confirmer votre adresse email en cliquant sur le bouton ci-dessous :",
+    ]
+
+    html_content = _build_html_email(
+        badge_label="Activation de compte",
+        headline="Bienvenue sur Encadrini",
+        greeting=f"Bonjour {first_name},",
+        body_paragraphs=body_paragraphs,
+        cta_label="Activer mon compte",
+        cta_url=confirmation_link,
+        expiry_notice="Ce lien de confirmation est sécurisé et demeure valide pendant <strong>24 heures</strong>.",
+        security_notice="Si vous n'êtes pas à l'origine de cette inscription, veuillez simplement ignorer cet email. Aucun compte ne sera activé sans votre confirmation.",
+    )
 
     text_content = f"""Bonjour {first_name},
 
-Merci de vous être inscrit sur Encadrini.
+Bienvenue sur Encadrini, la plateforme universitaire de suivi et d'encadrement des projets de fin d'études.
 
-Pour activer votre compte et commencer à utiliser la plateforme, veuillez cliquer sur le lien ci-dessous :
+Pour finaliser l'activation de votre compte et accéder à votre espace de travail, veuillez confirmer votre adresse email en ouvrant le lien suivant :
 {confirmation_link}
 
-Ce lien expire dans 24 heures.
+Validité : Ce lien demeure actif pendant 24 heures.
+Sécurité : Si vous n'êtes pas à l'origine de cette inscription, vous pouvez ignorer cet email en toute sécurité.
 
-Si vous n'êtes pas à l'origine de cette inscription, vous pouvez ignorer cet email.
-
+Cordialement,
 L'équipe Encadrini
-"""
-
-    html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; margin: 0; padding: 24px; }}
-    .container {{ max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 36px; border: 1px solid #e5e7eb; }}
-    .logo {{ font-size: 24px; font-weight: bold; color: #1e3a8a; margin-bottom: 24px; }}
-    .title {{ font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 16px; }}
-    .text {{ font-size: 15px; color: #4b5563; line-height: 1.6; margin-bottom: 24px; }}
-    .btn {{ display: inline-block; background-color: #2563eb; color: #ffffff !important; font-weight: 600; font-size: 15px; padding: 12px 28px; text-decoration: none; border-radius: 8px; margin: 12px 0 28px 0; text-align: center; }}
-    .link-alt {{ font-size: 13px; color: #6b7280; word-break: break-all; }}
-    .footer {{ font-size: 12px; color: #9ca3af; margin-top: 32px; border-top: 1px solid #f3f4f6; padding-top: 16px; }}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="logo">Encadrini</div>
-    <div class="title">Bienvenue, {first_name} !</div>
-    <p class="text">Merci de vous être inscrit sur <strong>Encadrini</strong>, la plateforme d'encadrement et de suivi des projets de fin d'études.</p>
-    <p class="text">Veuillez confirmer votre adresse email pour activer votre compte :</p>
-    <div>
-      <a href="{confirmation_link}" target="_blank" class="btn">Activer mon compte</a>
-    </div>
-    <p class="link-alt">Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br><a href="{confirmation_link}">{confirmation_link}</a></p>
-    <div class="footer">
-      Ce lien expire dans 24 heures.<br>
-      Si vous n'avez pas créé ce compte, veuillez ignorer ce message.
-    </div>
-  </div>
-</body>
-</html>
+Plateforme Académique & Suivi PFE
 """
 
     print(f"[email-confirmation] Confirmation link for {to_email}: {confirmation_link}", flush=True)
@@ -165,54 +274,37 @@ def build_password_reset_link(token: str) -> str:
 
 def send_password_reset_email(to_email: str, first_name: str, token: str) -> bool:
     reset_link = build_password_reset_link(token)
-    subject = "Réinitialisation de votre mot de passe - Encadrini"
+    subject = "Réinitialisation de votre mot de passe • Encadrini"
+
+    body_paragraphs = [
+        "Nous avons reçu une demande de réinitialisation du mot de passe associé à votre compte <strong>Encadrini</strong>.",
+        "Pour définir un nouveau mot de passe et rétablir vos accès en toute sécurité, veuillez cliquer sur le bouton suivant :",
+    ]
+
+    html_content = _build_html_email(
+        badge_label="Sécurité du compte",
+        headline="Réinitialisation de mot de passe",
+        greeting=f"Bonjour {first_name},",
+        body_paragraphs=body_paragraphs,
+        cta_label="Réinitialiser mon mot de passe",
+        cta_url=reset_link,
+        expiry_notice="Par mesure de sécurité, ce lien à usage unique expire dans <strong>1 heure</strong>.",
+        security_notice="Si vous n'avez pas sollicité cette réinitialisation, aucune action n'est requise. Votre mot de passe actuel reste actif et inchangé.",
+    )
 
     text_content = f"""Bonjour {first_name},
 
-Vous avez demandé la réinitialisation de votre mot de passe Encadrini.
+Nous avons reçu une demande de réinitialisation du mot de passe associé à votre compte Encadrini.
 
-Cliquez sur le lien ci-dessous pour définir un nouveau mot de passe :
+Pour définir un nouveau mot de passe sécurisé, veuillez suivre ce lien :
 {reset_link}
 
-Ce lien expire dans 1 heure.
+Validité : Ce lien à usage unique expire dans 1 heure.
+Sécurité : Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer ce message ; vos identifiants actuels demeurent parfaitement protégés.
 
-Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité.
-
+Cordialement,
 L'équipe Encadrini
-"""
-
-    html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; margin: 0; padding: 24px; }}
-    .container {{ max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 36px; border: 1px solid #e5e7eb; }}
-    .logo {{ font-size: 24px; font-weight: bold; color: #1e3a8a; margin-bottom: 24px; }}
-    .title {{ font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 16px; }}
-    .text {{ font-size: 15px; color: #4b5563; line-height: 1.6; margin-bottom: 24px; }}
-    .btn {{ display: inline-block; background-color: #2563eb; color: #ffffff !important; font-weight: 600; font-size: 15px; padding: 12px 28px; text-decoration: none; border-radius: 8px; margin: 12px 0 28px 0; text-align: center; }}
-    .link-alt {{ font-size: 13px; color: #6b7280; word-break: break-all; }}
-    .footer {{ font-size: 12px; color: #9ca3af; margin-top: 32px; border-top: 1px solid #f3f4f6; padding-top: 16px; }}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="logo">Encadrini</div>
-    <div class="title">Réinitialisation de mot de passe</div>
-    <p class="text">Bonjour <strong>{first_name}</strong>,</p>
-    <p class="text">Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte Encadrini.</p>
-    <div>
-      <a href="{reset_link}" target="_blank" class="btn">Changer mon mot de passe</a>
-    </div>
-    <p class="link-alt">Ou copiez ce lien :<br><a href="{reset_link}">{reset_link}</a></p>
-    <div class="footer">
-      Ce lien expire dans 1 heure.<br>
-      Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.
-    </div>
-  </div>
-</body>
-</html>
+Plateforme Académique & Suivi PFE
 """
 
     print(f"[password-reset] Reset link for {to_email}: {reset_link}", flush=True)
@@ -226,55 +318,55 @@ def build_invitation_link(token: str) -> str:
 
 def send_supervisor_invitation_email(to_email: str, student_name: str, project_title: str, token: str) -> bool:
     invitation_link = build_invitation_link(token)
-    subject = f"Invitation à encadrer le projet PFE de {student_name} - Encadrini"
+    subject = f"Invitation d'encadrement PFE : {project_title} • Encadrini"
+
+    body_paragraphs = [
+        f"L'étudiant(e) <strong>{student_name}</strong> vous invite formellement à assurer l'encadrement de son projet de fin d'études sur la plateforme <strong>Encadrini</strong>.",
+        "En acceptant cette invitation, vous accéderez à l'espace de suivi dédié, au calendrier des jalons clés, aux livrables de l'étudiant ainsi qu'aux outils d'évaluation.",
+    ]
+
+    detail_box = f"""
+    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #2563eb; margin-bottom: 4px;">
+      Projet de fin d'études
+    </div>
+    <div style="font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.4;">
+      « {project_title} »
+    </div>
+    <div style="font-size: 13px; color: #64748b; margin-top: 6px;">
+      Étudiant(e) demandeur(se) : <strong>{student_name}</strong>
+    </div>
+    """
+
+    html_content = _build_html_email(
+        badge_label="Supervision Académique",
+        headline="Invitation d'encadrement de projet",
+        greeting="Bonjour,",
+        body_paragraphs=body_paragraphs,
+        cta_label="Accepter l'encadrement",
+        cta_url=invitation_link,
+        detail_box=detail_box,
+        expiry_notice="Cette invitation est valable pendant <strong>7 jours</strong>.",
+        security_notice="Si cette demande ne vous concerne pas ou a été émise par erreur, vous pouvez simplement ignorer ce message.",
+    )
 
     text_content = f"""Bonjour,
 
-L'étudiant(e) {student_name} vous a invité(e) à encadrer son projet de fin d'études :
-« {project_title} »
+L'étudiant(e) {student_name} vous invite à assurer l'encadrement de son projet de fin d'études (PFE) sur la plateforme Encadrini.
 
-Pour créer ou lier votre compte encadreur et accepter l'invitation, cliquez sur ce lien :
+Projet : « {project_title} »
+Étudiant(e) : {student_name}
+
+En acceptant cette invitation, vous aurez accès à l'espace collaboratif du projet, au calendrier des jalons, aux livrables et aux outils d'évaluation.
+
+Pour accepter cette invitation, veuillez cliquer sur le lien suivant :
 {invitation_link}
 
-Ce lien expire dans 7 jours.
+Validité : Ce lien d'invitation reste valide pendant 7 jours.
+Si vous n'êtes pas concerné(e), vous pouvez ignorer cet email.
 
+Cordialement,
 L'équipe Encadrini
-"""
-
-    html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; margin: 0; padding: 24px; }}
-    .container {{ max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 36px; border: 1px solid #e5e7eb; }}
-    .logo {{ font-size: 24px; font-weight: bold; color: #1e3a8a; margin-bottom: 24px; }}
-    .title {{ font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 16px; }}
-    .text {{ font-size: 15px; color: #4b5563; line-height: 1.6; margin-bottom: 24px; }}
-    .project-box {{ background-color: #f3f4f6; border-left: 4px solid #2563eb; padding: 12px 16px; border-radius: 4px; margin-bottom: 24px; font-weight: 500; color: #1f2937; }}
-    .btn {{ display: inline-block; background-color: #2563eb; color: #ffffff !important; font-weight: 600; font-size: 15px; padding: 12px 28px; text-decoration: none; border-radius: 8px; margin: 12px 0 28px 0; text-align: center; }}
-    .link-alt {{ font-size: 13px; color: #6b7280; word-break: break-all; }}
-    .footer {{ font-size: 12px; color: #9ca3af; margin-top: 32px; border-top: 1px solid #f3f4f6; padding-top: 16px; }}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="logo">Encadrini</div>
-    <div class="title">Invitation d'encadrement PFE</div>
-    <p class="text">Bonjour,</p>
-    <p class="text">L'étudiant(e) <strong>{student_name}</strong> vous a invité(e) à être son encadreur sur le projet :</p>
-    <div class="project-box">« {project_title} »</div>
-    <div>
-      <a href="{invitation_link}" target="_blank" class="btn">Accepter l'invitation</a>
-    </div>
-    <p class="link-alt">Lien direct :<br><a href="{invitation_link}">{invitation_link}</a></p>
-    <div class="footer">
-      Ce lien expire dans 7 jours.<br>
-      Si vous n'êtes pas concerné(e), vous pouvez ignorer cet email.
-    </div>
-  </div>
-</body>
-</html>
+Plateforme Académique & Suivi PFE
 """
 
     print(f"[supervisor-invitation] Invitation link for {to_email}: {invitation_link}", flush=True)

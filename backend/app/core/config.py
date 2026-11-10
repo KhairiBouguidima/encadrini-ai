@@ -1,7 +1,7 @@
 import os
 from typing import Union
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Encadrini Platform API"
@@ -34,19 +34,23 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = "sk-fake-key-for-dev"
 
     REQUIRE_EMAIL_CONFIRMATION: bool = True
-    RESEND_API_KEY: str = ""
-    BREVO_API_KEY: str = ""
-    EMAIL_FROM: str = "Encadrini <onboarding@resend.dev>"
 
-    SMTP_HOST: str = "smtp.gmail.com"
+    # SMTP Configuration (loaded from .env)
+    SMTP_HOST: str = ""
     SMTP_PORT: int = 587
-    SMTP_USERNAME: str = "encadriniai@gmail.com"
-    SMTP_PASSWORD: str = "usdqzwaswcvmzyzz"
-    SMTP_FROM_EMAIL: str = "no-reply@encadrini.local"
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
     SMTP_USE_TLS: bool = True
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=(
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"),
+            ".env"
+        ),
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"
+    )
 
 settings = Settings()

@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react"
 import { Logo } from "./PublicNavbar"
 import { Avatar } from "../ui/Primitives"
-import { IconBell, IconLogout, IconSettings, IconMenu, IconClose } from "../ui/Icons"
+import { IconBell, IconLogout, IconMenu, IconClose, IconSun, IconMoon } from "../ui/Icons"
+import { useTheme } from "../../lib/ThemeContext"
 
 export interface NavItem {
   key: string
@@ -32,6 +33,7 @@ export function AppShell({
   children: ReactNode
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { theme, toggleTheme } = useTheme()
 
   const handleNavClick = (key: string) => {
     onNavigate(key)
@@ -40,13 +42,13 @@ export function AppShell({
 
   const renderNavContent = () => (
     <>
-      <div className="px-5 py-5 border-b border-neutral-200 flex items-center justify-between">
+      <div className="px-5 py-5 border-b border-neutral-200 dark:border-neutral-300 flex items-center justify-between">
         <button onClick={() => handleNavClick(activeKey)} className="cursor-pointer">
           <Logo />
         </button>
         <button
           onClick={() => setMobileOpen(false)}
-          className="md:hidden p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 cursor-pointer"
+          className="md:hidden p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-200 cursor-pointer"
           title="Fermer le menu"
         >
           <IconClose size={20} />
@@ -62,12 +64,12 @@ export function AppShell({
               onClick={() => handleNavClick(item.key)}
               className={`w-full flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium font-body transition-colors cursor-pointer ${
                 isActive
-                  ? "bg-primary-50 text-primary-700 font-semibold"
-                  : "text-neutral-600 hover:bg-neutral-100"
+                  ? "bg-primary-50 text-primary-700 dark:bg-primary-50 dark:text-primary-400 font-semibold"
+                  : "text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-200"
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className={isActive ? "text-primary-600" : "text-neutral-400"}>
+                <span className={isActive ? "text-primary-600 dark:text-primary-400" : "text-neutral-400"}>
                   {item.icon}
                 </span>
                 <span className="truncate">{item.label}</span>
@@ -76,8 +78,8 @@ export function AppShell({
                 <span
                   className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
                     isActive
-                      ? "bg-primary-200 text-primary-800"
-                      : "bg-neutral-200 text-neutral-700"
+                      ? "bg-primary-200 text-primary-800 dark:bg-primary-200 dark:text-primary-300"
+                      : "bg-neutral-200 text-neutral-700 dark:bg-neutral-300 dark:text-neutral-700"
                   }`}
                 >
                   {item.badge}
@@ -89,17 +91,17 @@ export function AppShell({
       </nav>
 
       {sidebarExtra && (
-        <div className="flex-1 px-3 py-3 border-t border-neutral-200 overflow-y-auto min-h-0 space-y-2">
+        <div className="flex-1 px-3 py-3 border-t border-neutral-200 dark:border-neutral-300 overflow-y-auto min-h-0 space-y-2">
           {sidebarExtra}
         </div>
       )}
 
       {!sidebarExtra && <div className="flex-1" />}
 
-      <div className="px-3 py-4 border-t border-neutral-200 space-y-2 bg-neutral-50/50">
+      <div className="px-3 py-4 border-t border-neutral-200 dark:border-neutral-300 space-y-2 bg-neutral-50/50 dark:bg-neutral-100/50">
         <button
           onClick={() => handleNavClick("profile")}
-          className="w-full text-left rounded-lg p-2 hover:bg-neutral-100 transition-colors duration-150 cursor-pointer"
+          className="w-full text-left rounded-lg p-2 hover:bg-neutral-100 dark:hover:bg-neutral-200 transition-colors duration-150 cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <Avatar name={userName} role={userRole} size="sm" />
@@ -115,9 +117,9 @@ export function AppShell({
         {onExit && (
           <button
             onClick={onExit}
-            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium font-body text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium font-body text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
           >
-            <IconLogout size={18} className="text-rose-500" />
+            <IconLogout size={18} className="text-rose-500 dark:text-rose-400" />
             Déconnexion
           </button>
         )}
@@ -126,9 +128,9 @@ export function AppShell({
   )
 
   return (
-    <div className="min-h-screen flex bg-neutral-50">
+    <div className="min-h-screen flex bg-neutral-50 dark:bg-neutral-0">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 flex-shrink-0 bg-white border-r border-neutral-200 flex-col h-screen sticky top-0 z-20">
+      <aside className="hidden md:flex w-64 flex-shrink-0 bg-white dark:bg-neutral-100 border-r border-neutral-200 dark:border-neutral-300 flex-col h-screen sticky top-0 z-20">
         {renderNavContent()}
       </aside>
 
@@ -142,7 +144,7 @@ export function AppShell({
 
       {/* Mobile Drawer Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 w-72 bg-white z-50 flex flex-col shadow-2xl transition-transform duration-200 ease-in-out md:hidden ${
+        className={`fixed inset-y-0 left-0 w-72 bg-white dark:bg-neutral-100 z-50 flex flex-col shadow-2xl transition-transform duration-200 ease-in-out md:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -151,11 +153,11 @@ export function AppShell({
 
       {/* Main Content Area */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 flex-shrink-0 bg-white border-b border-neutral-200 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-10">
+        <header className="h-16 flex-shrink-0 bg-white dark:bg-neutral-100 border-b border-neutral-200 dark:border-neutral-300 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
-              className="md:hidden p-2 rounded-lg text-neutral-600 hover:bg-neutral-100 cursor-pointer"
+              className="md:hidden p-2 rounded-lg text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-200 cursor-pointer"
               title="Ouvrir le menu"
             >
               <IconMenu size={22} />
@@ -169,23 +171,26 @@ export function AppShell({
             <button
               onClick={() => onNavigate("notifications")}
               title="Notifications"
-              className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 hover:bg-neutral-100 transition-colors relative cursor-pointer"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-200 transition-colors relative cursor-pointer"
             >
               <IconBell size={18} />
               <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-danger-600" />
             </button>
+
+            {/* ── Dark / Light Mode Toggle ── */}
             <button
-              onClick={() => onNavigate("profile")}
-              title="Paramètres"
-              className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 hover:bg-neutral-100 transition-colors cursor-pointer"
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-200 transition-colors cursor-pointer"
             >
-              <IconSettings size={18} />
+              {theme === "dark" ? <IconSun size={18} /> : <IconMoon size={18} />}
             </button>
+
             {onExit && (
               <button
                 onClick={onExit}
                 title="Se déconnecter"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors cursor-pointer dark:text-rose-400 dark:border-rose-800 dark:hover:bg-rose-950/30"
               >
                 <IconLogout size={15} />
                 <span className="hidden sm:inline">Déconnexion</span>

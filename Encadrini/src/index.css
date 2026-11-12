@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-display: 'Plus Jakarta Sans', sans-serif;
   --font-body: 'Inter', sans-serif;
@@ -66,6 +68,37 @@
   --spacing-16: 64px;
 }
 
+/* ── Dark-mode semantic overrides ──────────────────────────────────── */
+.dark {
+  --color-neutral-0: #0f1420;
+  --color-neutral-50: #151b2b;
+  --color-neutral-100: #1a2236;
+  --color-neutral-200: #232d44;
+  --color-neutral-300: #2e3a54;
+  --color-neutral-400: #4b5670;
+  --color-neutral-500: #7b849e;
+  --color-neutral-600: #a1a9be;
+  --color-neutral-700: #c5cad8;
+  --color-neutral-800: #e2e5ec;
+  --color-neutral-900: #f2f3f6;
+
+  --color-primary-50: #1a1740;
+  --color-primary-100: #252054;
+  --color-primary-200: #3730a3;
+
+  --color-ai-50: #1b1538;
+  --color-ai-100: #261d4d;
+
+  --color-success-100: #0f2918;
+  --color-success-600: #22c55e;
+  --color-warning-100: #2a2308;
+  --color-warning-600: #eab308;
+  --color-danger-100: #2e1010;
+  --color-danger-600: #ef4444;
+  --color-info-100: #0e1e3a;
+  --color-info-600: #3b82f6;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -74,8 +107,9 @@ html {
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8f9fc;
-  color: #1e2535;
+  background-color: var(--color-neutral-50);
+  color: var(--color-neutral-900);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 ::-webkit-scrollbar {
@@ -86,9 +120,9 @@ html {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d1d5e0;
+  background: var(--color-neutral-300);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3b8;
+  background: var(--color-neutral-400);
 }

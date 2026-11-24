@@ -8,6 +8,7 @@ class UserRole(str, Enum):
     STUDENT = "STUDENT"
     ENCADRER = "ENCADRER"
     ADMIN = "ADMIN"
+    TECHNICIAN = "TECHNICIAN"
 
 class User(Document):
     email: Indexed(EmailStr, unique=True)
@@ -19,6 +20,10 @@ class User(Document):
     gender: str = ""
     phone_number: str = ""
     is_active: bool = False
+    specialties: list[str] = Field(default_factory=list)
+    bio: str = ""
+    is_trusted_technician: bool = False
+    completed_assistance_count: int = 0
     email_confirm_token_hash: Optional[str] = None
     email_confirm_expires_at: Optional[datetime] = None
     email_confirmed_at: Optional[datetime] = None

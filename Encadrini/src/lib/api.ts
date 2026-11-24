@@ -1,4 +1,4 @@
-export type UserRole = "STUDENT" | "ENCADRER" | "ADMIN"
+export type UserRole = "STUDENT" | "ENCADRER" | "ADMIN" | "TECHNICIAN"
 
 export interface User {
   id: string
@@ -312,6 +312,8 @@ export interface PlatformStats {
   total_students: number
   total_encadrers: number
   total_admins: number
+  total_technicians?: number
+  total_assistance_requests?: number
   active_users: number
   total_projects: number
   total_reports: number
@@ -826,6 +828,94 @@ export const api = {
       body: JSON.stringify({ plan }),
     })
   },
+  // ── Tunisian Payment Gateways (Konnect, Flouci, Paymee) ───────
+  getPaymentProviders() {
+    return request<PaymentProvidersResponse>("/payments/providers")
+  },
+  initiatePayment(provider: PaymentGatewayProvider, plan: string = "PREMIUM") {
+    return request<PaymentInitiateResponse>("/payments/initiate", {
+      method: "POST",
+      body: JSON.stringify({ provider, plan }),
+    })
+  },
+  verifyPayment(transactionId: string) {
+    return request<PaymentVerifyResponse>(`/payments/verify/${transactionId}`)
+  },
+  // ── Assistance & Mise en page (Techniciens) ────────────────────
+  createTechnician(payload: {
+    first_name: string
+    last_name: string
+    email: string
+    password: string
+    phone_number: string
+    specialties: string[]
+    bio?: string
+  }) {
+    return request<Technician>("/assistance/admin/technicians", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+  },
+  listTechnicians() {
+    return request<Technician[]>("/assistance/admin/technicians")
+  },
+  listAllAssistanceRequestsAdmin() {
+    return request<AssistanceRequest[]>("/assistance/admin/requests")
+  },
+  assignTechnician(requestId: string, technicianId: string) {
+    return request<AssistanceRequest>(`/assistance/admin/requests/${requestId}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ technician_id: technicianId }),
+    })
+  },
+  createAssistanceRequest(payload: {
+    report_title: string
+    service_type: AssistanceServiceType
+    project_id?: string
+    report_id?: string
+    notes_from_student?: string
+    deadline_date?: string
+    payment_provider?: string
+    student_file_url?: string
+    student_file_name?: string
+  }) {
+    return request<AssistanceRequest>("/assistance/requests", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+  },
+  listStudentAssistanceRequests() {
+    return request<AssistanceRequest[]>("/assistance/requests")
+  },
+  rateAssistanceRequest(requestId: string, rating: number, feedback?: string) {
+    return request<AssistanceRequest>(`/assistance/requests/${requestId}/rate`, {
+      method: "POST",
+      body: JSON.stringify({ rating, feedback }),
+    })
+  },
+  listTechnicianTasks() {
+    return request<AssistanceRequest[]>("/assistance/technician/tasks")
+  },
+  deliverTechnicianTask(requestId: string, formData: FormData) {
+    const token = getAccessToken()
+    return fetch(`${API_BASE_URL}/assistance/technician/tasks/${requestId}/deliver`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    }).then(async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Erreur lors de la livraison du rapport." }))
+        throw new Error(err.detail || `HTTP ${res.status}`)
+      }
+      return res.json() as Promise<AssistanceRequest>
+    })
+  },
+  getAssistanceDownloadUrl(requestId: string, fileType: "student" | "delivered") {
+    const token = getAccessToken()
+    return `${API_BASE_URL}/assistance/download/${requestId}/${fileType}?token=${token || ""}`
+  },
   createMockDefense(formData: FormData) {
     const token = getAccessToken()
     return fetch(`${API_BASE_URL}/mock-defense/`, {
@@ -1072,6 +1162,105 @@ export type JuryRole = "PRESIDENT" | "TECHNICAL" | "CRITICAL"
 export type DefenseMode = "TRAINING" | "REALISTIC" | "STRESS_TEST"
 export type DefenseDifficulty = "beginner" | "intermediate" | "expert"
 export type DefenseLanguage = "fr" | "en" | "ar"
+
+export type PaymentGatewayProvider = "KONNECT" | "FLOUCI" | "PAYMEE"
+
+export interface PaymentProviderInfo {
+  id: PaymentGatewayProvider
+  name: string
+  description: string
+  badges: string[]
+  is_configured: boolean
+}
+
+export interface PaymentProvidersResponse {
+  price_tnd: number
+  currency: string
+  plan: string
+  providers: PaymentProviderInfo[]
+}
+
+export interface PaymentInitiateResponse {
+  transaction_id: string
+  provider: PaymentGatewayProvider
+  amount_tnd: number
+  currency: string
+  pay_url: string
+  is_simulation: boolean
+  message: string
+}
+
+export interface PaymentVerifyResponse {
+  transaction_id: string
+  status: "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED"
+  is_successful: boolean
+  plan: string
+  provider: PaymentGatewayProvider
+  message: string
+}
+
+// ── Report Assistance & Technicians ─────────────────────────────
+export type AssistanceServiceType =
+  | "MISE_EN_PAGE_WORD"
+  | "TEMPLATE_LATEX"
+  | "CORRECTION_STYLE"
+  | "PACK_COMPLET"
+
+export type AssistanceRequestStatus =
+  | "PENDING_PAYMENT"
+  | "PENDING_ASSIGNMENT"
+  | "IN_PROGRESS"
+  | "DELIVERED"
+  | "COMPLETED"
+  | "CANCELLED"
+
+export interface Technician {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  phone_number: string
+  specialties: string[]
+  is_active: boolean
+  is_trusted_technician: boolean
+  completed_assistance_count: number
+  created_at: string
+}
+
+export interface AssistanceRequest {
+  id: string
+  student_id: string
+  student_name: string
+  student_email: string
+  student_phone: string
+  project_id?: string | null
+  project_title?: string | null
+  report_id?: string | null
+  report_title: string
+  service_type: AssistanceServiceType
+  service_label: string
+  notes_from_student: string
+  deadline_date?: string | null
+  price_tnd: number
+  payment_status: string
+  payment_provider?: string | null
+  status: AssistanceRequestStatus
+  assigned_technician_id?: string | null
+  assigned_technician_name?: string | null
+  assigned_technician_email?: string | null
+  assigned_technician_phone?: string | null
+  student_file_url?: string | null
+  student_file_name?: string | null
+  delivered_file_url?: string | null
+  delivered_file_name?: string | null
+  technician_notes?: string | null
+  rating?: number | null
+  feedback?: string | null
+  created_at: string
+  assigned_at?: string | null
+  delivered_at?: string | null
+  completed_at?: string | null
+}
 
 export interface SubscriptionUsage {
   plan: string

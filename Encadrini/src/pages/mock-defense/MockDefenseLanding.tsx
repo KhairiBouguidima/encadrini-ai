@@ -28,6 +28,7 @@ export function MockDefenseLanding({
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [paymentNotice, setPaymentNotice] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -48,6 +49,43 @@ export function MockDefenseLanding({
 
   useEffect(() => {
     fetchData()
+
+    // Handle return from Tunisian payment gateways (Konnect, Flouci, Paymee)
+    const params = new URLSearchParams(window.location.search)
+    const paymentStatus = params.get("payment")
+    const txId = params.get("tx_id")
+    const provider = params.get("provider")
+
+    if (paymentStatus === "success" || paymentStatus === "simulated") {
+      if (txId) {
+        api.verifyPayment(txId)
+          .then((res) => {
+            if (res.is_successful) {
+              setPaymentNotice({
+                type: "success",
+                message: `Paiement confirmé via ${res.provider || provider || "passerelle tunisienne"} ! Votre forfait PREMIUM est actif (25 simulations).`,
+              })
+              fetchData()
+            }
+          })
+          .catch(() => {
+            fetchData()
+          })
+      } else {
+        setPaymentNotice({
+          type: "success",
+          message: "Paiement réussi ! Votre forfait PREMIUM est activé.",
+        })
+        fetchData()
+      }
+      window.history.replaceState({}, document.title, window.location.pathname)
+    } else if (paymentStatus === "failed") {
+      setPaymentNotice({
+        type: "error",
+        message: "La transaction de paiement a été annulée ou n'a pas pu être validée.",
+      })
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
   }, [])
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -68,6 +106,26 @@ export function MockDefenseLanding({
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
+      {/* Payment Notification Alert */}
+      {paymentNotice && (
+        <div className={`p-4 rounded-2xl border flex items-center justify-between text-sm ${
+          paymentNotice.type === "success"
+            ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+            : "bg-danger-50 border-danger-200 text-danger-700"
+        }`}>
+          <div className="flex items-center gap-2 font-medium">
+            <IconSparkles size={18} className={paymentNotice.type === "success" ? "text-emerald-600" : "text-danger-600"} />
+            <span>{paymentNotice.message}</span>
+          </div>
+          <button
+            onClick={() => setPaymentNotice(null)}
+            className="text-xs underline hover:no-underline cursor-pointer"
+          >
+            Fermer
+          </button>
+        </div>
+      )}
+
       {/* Hero Banner */}
       <div className="relative rounded-3xl bg-gradient-to-r from-primary-950 via-primary-900 to-indigo-950 p-8 sm:p-10 text-white overflow-hidden shadow-xl border border-primary-800/50">
         <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl pointer-events-none" />

@@ -12,7 +12,7 @@ def asyncio_event_loop():
     yield loop
     loop.close()
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session", autouse=False)
 async def initialize_test_db(asyncio_event_loop):
     client = AsyncIOMotorClient("mongodb://localhost:27017")
     test_db_name = "encadrini_test_db"

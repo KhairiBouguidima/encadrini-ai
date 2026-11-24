@@ -16,6 +16,7 @@ import { AIWorkshop } from "./pages/ai-workshop/AIWorkshop"
 import { MockDefensePage } from "./pages/mock-defense/MockDefensePage"
 import { ComplianceCheckerPage } from "./pages/compliance/ComplianceCheckerPage"
 import { AdminDashboard } from "./pages/admin/AdminDashboard"
+import { TechnicianDashboard } from "./pages/technician/TechnicianDashboard"
 import { CertificateVerificationPage } from "./pages/certificates/CertificateVerificationPage"
 import { api, clearSession, getStoredUser, SESSION_EXPIRED_EVENT, type User } from "./lib/api"
 
@@ -33,6 +34,7 @@ type Route =
   | "supervisor-reviewer"
   | "ai-workshop"
   | "admin-dashboard"
+  | "technician-dashboard"
   | "mock-defense"
   | "compliance"
   | "profile"
@@ -65,15 +67,16 @@ export default function App() {
     if (storedUser?.role === "STUDENT") return "student-dashboard"
     if (storedUser?.role === "ENCADRER") return "supervisor-reviewer"
     if (storedUser?.role === "ADMIN") return "admin-dashboard"
+    if (storedUser?.role === "TECHNICIAN") return "technician-dashboard"
     return "landing"
   })
-  const [adminTab, setAdminTab] = useState<"overview" | "users" | "projects">("overview")
+  const [adminTab, setAdminTab] = useState<"overview" | "users" | "projects" | "technicians">("overview")
   const [supervisorInitialTab, setSupervisorInitialTab] = useState<"reports" | "meetings" | "certificate">("reports")
 
   const handleGlobalNavigate = (target: string) => {
     if (user?.role === "ADMIN") {
-      if (target === "overview" || target === "users" || target === "projects") {
-        setAdminTab(target)
+      if (target === "overview" || target === "users" || target === "projects" || target === "technicians") {
+        setAdminTab(target as any)
         setRoute("admin-dashboard")
         return
       }
@@ -129,6 +132,7 @@ export default function App() {
 
     if (nextUser.role === "STUDENT") setRoute("student-dashboard")
     else if (nextUser.role === "ENCADRER") setRoute("supervisor-reviewer")
+    else if (nextUser.role === "TECHNICIAN") setRoute("technician-dashboard")
     else setRoute("admin-dashboard")
   }
 
@@ -270,6 +274,12 @@ export default function App() {
           onExit={handleExit}
           user={user}
           initialTab={adminTab}
+        />
+      )}
+      {route === "technician-dashboard" && (
+        <TechnicianDashboard
+          user={user}
+          onExit={handleExit}
         />
       )}
       {route === "profile" && (

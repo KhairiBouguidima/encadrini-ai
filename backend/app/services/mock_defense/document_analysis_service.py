@@ -2,7 +2,7 @@ import io
 import re
 import zipfile
 import xml.etree.ElementTree as ET
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from app.models.mock_defense import ProjectKnowledgeProfile
 
 class DocumentAnalysisService:
@@ -144,6 +144,73 @@ class DocumentAnalysisService:
 
         scored.sort(key=lambda x: x[0], reverse=True)
         return [item[1] for item in scored[:top_k]]
+
+    @classmethod
+    async def store_chunks(
+        cls,
+        chunks: List[Dict[str, Any]],
+        student_id: str,
+        project_id: str,
+        document_id: str,
+        doc_type: str = "report"
+    ) -> int:
+        """
+        Stores chunked document into Qdrant vector store via RAGEngine.
+        Returns the number of successfully indexed chunks.
+        """
+        try:
+            from app.services.mock_defense.rag_engine import get_rag_engine
+            engine = get_rag_engine()
+            if engine.is_available:
+                return await engine.upsert_chunks(
+                    chunks=chunks,
+                    student_id=student_id,
+                    project_id=project_id,
+                    document_id=document_id,
+                    doc_type=doc_type
+                )
+        except Exception as e:
+            print(f"[doc-analysis] store_chunks error (continuing without vector index): {e}")
+        return 0
+
+    @classmethod
+    async def semantic_retrieve(
+        cls,
+        query: str,
+        chunks: Optional[List[Dict[str, Any]]] = None,
+        student_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        document_id: Optional[str] = None,
+        doc_type: Optional[str] = None,
+        top_k: int = 3
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieves top_k chunks using dense vector similarity from Qdrant.
+        Gracefully falls back to keyword-based retrieve_relevant_chunks() if:
+        - Qdrant is unavailable or unconfigured,
+        - Vector search returns empty and in-memory chunks are provided.
+        """
+        try:
+            from app.services.mock_defense.rag_engine import get_rag_engine
+            engine = get_rag_engine()
+            if engine.is_available:
+                results = await engine.semantic_search(
+                    query=query,
+                    student_id=student_id,
+                    project_id=project_id,
+                    document_id=document_id,
+                    doc_type=doc_type,
+                    top_k=top_k
+                )
+                if results:
+                    return results
+        except Exception as e:
+            print(f"[doc-analysis] semantic_retrieve failed ({e}); falling back to keyword search")
+
+        # Fallback to existing keyword retriever if in-memory chunks are provided
+        if chunks:
+            return cls.retrieve_relevant_chunks(query, chunks, top_k=top_k)
+        return []
 
     @classmethod
     def build_knowledge_profile(

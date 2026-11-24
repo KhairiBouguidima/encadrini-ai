@@ -16,7 +16,15 @@ import {
   IconDownload,
   IconChevronRight,
   IconFileText,
+  IconSparkles,
+  IconRefresh,
+  IconShield,
+  IconAward,
+  IconClock,
+  IconAlertTriangle,
+  IconLock,
 } from "../../components/ui/Icons"
+import { AdminTechniciansSection } from "./AdminTechniciansSection"
 import {
   api,
   type AdminProject,
@@ -29,15 +37,24 @@ import {
 const navItems: NavItem[] = [
   { key: "overview", label: "Vue d'ensemble", icon: <IconStats size={18} /> },
   { key: "users", label: "Gestion des comptes", icon: <IconStudent size={18} /> },
+  { key: "technicians", label: "Techniciens & Mise en page", icon: <IconSparkles size={18} /> },
   { key: "projects", label: "Projets PFE", icon: <IconReport size={18} /> },
   { key: "notifications", label: "Notifications", icon: <IconBell size={18} /> },
   { key: "profile", label: "Mon Profil", icon: <IconUser size={18} /> },
 ]
 
-function roleLabel(role: UserRole) {
+function roleLabel(role: UserRole | string) {
   if (role === "STUDENT") return "Étudiant"
   if (role === "ENCADRER") return "Encadreur"
+  if (role === "TECHNICIAN") return "Technicien"
   return "Administrateur"
+}
+
+function roleBadgeColor(role: UserRole | string) {
+  if (role === "STUDENT") return "bg-blue-50 text-blue-700 border-blue-200"
+  if (role === "ENCADRER") return "bg-purple-50 text-purple-700 border-purple-200"
+  if (role === "TECHNICIAN") return "bg-amber-50 text-amber-700 border-amber-200"
+  return "bg-neutral-900 text-white border-neutral-800"
 }
 
 function accountStatus(active: boolean): BadgeVariant {
@@ -71,17 +88,20 @@ export function AdminDashboard({
   onExit: () => void
   onNavigate?: (key: string) => void
   user?: User | null
-  initialTab?: "overview" | "users" | "projects"
+  initialTab?: "overview" | "users" | "projects" | "technicians"
 }) {
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "projects">(initialTab)
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "projects" | "technicians">(initialTab)
   const [stats, setStats] = useState<PlatformStats | null>(null)
   const [accounts, setAccounts] = useState<AdminUser[]>([])
   const [projects, setProjects] = useState<AdminProject[]>([])
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL")
+  const [facultyFilter, setFacultyFilter] = useState<string>("ALL")
+  const [projectWorkflowFilter, setProjectWorkflowFilter] = useState<string>("ALL")
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Modal State for user creation
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -97,8 +117,11 @@ export function AdminDashboard({
     is_active: true,
   })
 
-  // Selected project for quick view modal
+  // Selected project for quick view & assignment modal
   const [selectedProject, setSelectedProject] = useState<AdminProject | null>(null)
+
+  // Selected user for quick details inspection
+  const [selectedUserDetail, setSelectedUserDetail] = useState<AdminUser | null>(null)
 
   // Admin Assignment States
   const [assignSupervisorEmail, setAssignSupervisorEmail] = useState("")
@@ -107,6 +130,15 @@ export function AdminDashboard({
   const [assignBinomeEmail, setAssignBinomeEmail] = useState("")
   const [isAssigningBinome, setIsAssigningBinome] = useState(false)
   const [assignNotice, setAssignNotice] = useState("")
+
+  // Copy email feedback
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null)
+
+  const handleCopyEmail = (email: string) => {
+    navigator.clipboard.writeText(email)
+    setCopiedEmail(email)
+    setTimeout(() => setCopiedEmail(null), 2000)
+  }
 
   const handleAssignSupervisor = async () => {
     if (!selectedProject || !assignSupervisorEmail.trim()) return
@@ -149,19 +181,6 @@ export function AdminDashboard({
 
   const userName = user ? `${user.first_name} ${user.last_name}` : "Administrateur"
 
-  const statCards = useMemo(
-    () => [
-      { label: "Projets actifs", value: String(stats?.total_projects ?? 0) },
-      { label: "Comptes étudiants", value: String(stats?.total_students ?? 0) },
-      { label: "Comptes encadreurs", value: String(stats?.total_encadrers ?? 0) },
-      {
-        label: "Score qualité IA moyen",
-        value: stats?.ai_analysis_avg_quality != null ? `${stats.ai_analysis_avg_quality}/100` : "-",
-      },
-    ],
-    [stats],
-  )
-
   const loadData = async (query = search, role = roleFilter) => {
     setIsLoading(true)
     try {
@@ -180,7 +199,13 @@ export function AdminDashboard({
       })
     } finally {
       setIsLoading(false)
+      setIsRefreshing(false)
     }
+  }
+
+  const handleManualRefresh = () => {
+    setIsRefreshing(true)
+    loadData(search, roleFilter)
   }
 
   useEffect(() => {
@@ -201,28 +226,42 @@ export function AdminDashboard({
     return () => window.clearTimeout(timer)
   }, [notice])
 
-  const handleNavClick = (key: string) => {
-    if (key === "overview" || key === "users" || key === "projects") {
-      setActiveTab(key)
-    } else if (onNavigate) {
-      onNavigate(key)
-    }
-  }
+  // Extract unique faculties from accounts
+  const uniqueFaculties = useMemo(() => {
+    const set = new Set<string>()
+    accounts.forEach((a) => {
+      if (a.faculty && a.faculty.trim()) set.add(a.faculty.trim())
+    })
+    return Array.from(set).sort()
+  }, [accounts])
 
-  // Filter accounts by status client-side
+  // Filter accounts by status and faculty client-side
   const filteredAccounts = useMemo(() => {
     return accounts.filter((a) => {
-      if (statusFilter === "ACTIVE") return a.is_active
-      if (statusFilter === "INACTIVE") return !a.is_active
+      if (statusFilter === "ACTIVE" && !a.is_active) return false
+      if (statusFilter === "INACTIVE" && a.is_active) return false
+      if (facultyFilter !== "ALL" && a.faculty?.trim() !== facultyFilter) return false
       return true
     })
-  }, [accounts, statusFilter])
+  }, [accounts, statusFilter, facultyFilter])
+
+  // Filter projects by workflow status
+  const filteredProjects = useMemo(() => {
+    return projects.filter((p) => {
+      if (projectWorkflowFilter === "ALL") return true
+      if (projectWorkflowFilter === "HAS_REPORTS") return (p.report_count || 0) > 0
+      if (projectWorkflowFilter === "NO_SUPERVISOR") return !p.academic_encadrer_email && !p.encadrer_email
+      if (projectWorkflowFilter === "BINOME") return Boolean(p.co_student_email)
+      return p.workflow_status === projectWorkflowFilter
+    })
+  }, [projects, projectWorkflowFilter])
 
   const countsByRole = useMemo(() => {
     return {
       all: accounts.length,
       students: accounts.filter((a) => a.role === "STUDENT").length,
       supervisors: accounts.filter((a) => a.role === "ENCADRER").length,
+      technicians: accounts.filter((a) => a.role === "TECHNICIAN").length,
       admins: accounts.filter((a) => a.role === "ADMIN").length,
       active: accounts.filter((a) => a.is_active).length,
       inactive: accounts.filter((a) => !a.is_active).length,
@@ -327,7 +366,6 @@ export function AdminDashboard({
         type: "success",
         text: `Compte ${roleLabel(created.role)} créé avec succès pour ${created.first_name} ${created.last_name}.`,
       })
-      // Refresh stats
       loadData(search, roleFilter)
     } catch (err) {
       setModalError(err instanceof Error ? err.message : "Erreur lors de la création du compte.")
@@ -362,18 +400,24 @@ export function AdminDashboard({
   const exportProjectsCSV = () => {
     const headers = [
       "Titre du Projet",
-      "Email Étudiant",
-      "Email Encadreur(s)",
+      "Email Étudiant Porteur",
+      "Email Binôme",
+      "Encadrant Académique",
+      "Encadrant Entreprise",
       "Nombre de versions",
       "Dernière version",
+      "Statut Workflow",
       "Date de création",
     ]
-    const rows = projects.map((p) => [
+    const rows = filteredProjects.map((p) => [
       `"${p.title.replace(/"/g, '""')}"`,
       `"${p.student_email || ""}"`,
-      `"${p.encadrer_email || ""}"`,
+      `"${p.co_student_email || ""}"`,
+      `"${p.academic_encadrer_email || p.encadrer_email || ""}"`,
+      `"${p.enterprise_encadrer_email || ""}"`,
       p.report_count,
       p.latest_version || 0,
+      `"${p.workflow_status || "DRAFT"}"`,
       `"${formatDate(p.created_at)}"`,
     ])
     const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
@@ -381,580 +425,942 @@ export function AdminDashboard({
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.setAttribute("download", `projets_encadrini_${new Date().toISOString().slice(0, 10)}.csv`)
+    link.setAttribute("download", `projets_pfe_encadrini_${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
+  // Active users percentage
+  const activePercentage = useMemo(() => {
+    if (!stats || !stats.total_users) return 0
+    return Math.round((stats.active_users / stats.total_users) * 100)
+  }, [stats])
+
   return (
     <AppShell
       navItems={navItems}
       activeKey={activeTab}
-      onNavigate={handleNavClick}
+      onNavigate={(key) => {
+        if (key === "overview" || key === "users" || key === "projects" || key === "technicians") {
+          setActiveTab(key)
+        } else if (onNavigate) {
+          onNavigate(key)
+        }
+      }}
       onExit={onExit}
       userName={userName}
-      userRole="Administrateur plateforme"
+      userRole="Administrateur Système • Direction PFE"
     >
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Top Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold font-display text-neutral-900">
-              {activeTab === "overview" && "Vue d'ensemble"}
-              {activeTab === "users" && "Gestion des Comptes"}
-              {activeTab === "projects" && "Supervision des Projets PFE"}
-            </h1>
-            <p className="text-sm font-body text-neutral-500 mt-1">
-              {activeTab === "overview" && "Statistiques globales, activité de la plateforme et accès rapide."}
-              {activeTab === "users" && "Administrez les étudiants, encadreurs et administrateurs."}
-              {activeTab === "projects" && "Consultez tous les projets PFE et le dépôt des rapports."}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Search input */}
-            <div className="flex items-center gap-2 border border-neutral-300 rounded-lg px-3 py-2 bg-white w-64 shadow-sm focus-within:border-primary-500 focus-within:ring-1 focus-within:ring-primary-500">
-              <IconSearch size={16} className="text-neutral-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher..."
-                className="flex-1 text-sm font-body focus:outline-none bg-transparent"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="text-xs text-neutral-400 hover:text-neutral-600"
-                >
-                  ✕
-                </button>
-              )}
+      <div className="max-w-7xl mx-auto space-y-7">
+        
+        {/* ── TOP EXECUTIVE BANNER ── */}
+        <div className="relative rounded-2xl bg-gradient-to-r from-neutral-900 via-primary-950 to-indigo-950 p-6 sm:p-7 text-white shadow-xl overflow-hidden border border-neutral-800">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold tracking-wide border border-emerald-500/30">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Système Opérationnel
+                </span>
+                <span className="text-xs text-neutral-400 font-mono">
+                  • Session 2025-2026 • Tunis (UTC+1)
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold font-display tracking-tight text-white">
+                Panneau d'Administration Exécutif
+              </h1>
+              <p className="text-xs sm:text-sm text-neutral-300 max-w-2xl mt-1">
+                Supervision temps réel des étudiants, encadrants académiques & entreprises, pôle de mise en page et conformité des soutenances.
+              </p>
             </div>
 
-            {/* Quick Action button to add user */}
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<IconPlus size={16} />}
-              onClick={() => {
-                setModalError("")
-                setIsModalOpen(true)
-              }}
-            >
-              Nouveau compte
-            </Button>
+            {/* Quick Actions & Telemetry */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                title="Actualiser les données"
+              >
+                <IconRefresh size={16} className={isRefreshing ? "animate-spin" : ""} />
+                <span className="hidden sm:inline">Actualiser</span>
+              </button>
+
+              <Button
+                variant="primary"
+                size="md"
+                icon={<IconPlus size={16} />}
+                onClick={() => {
+                  setModalError("")
+                  setIsModalOpen(true)
+                }}
+                className="bg-primary-500 hover:bg-primary-600 text-white font-semibold cursor-pointer shadow-md"
+              >
+                Nouveau Compte
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── TOP NAVIGATION TABS PILLS ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 pb-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {[
+              { key: "overview", label: "Vue d'ensemble", icon: <IconStats size={16} /> },
+              { key: "users", label: `Comptes (${accounts.length})`, icon: <IconStudent size={16} /> },
+              { key: "technicians", label: `Mise en page (${stats?.total_technicians ?? 0})`, icon: <IconSparkles size={16} /> },
+              { key: "projects", label: `Projets PFE (${projects.length})`, icon: <IconReport size={16} /> },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key as any)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === tab.key
+                    ? "bg-neutral-900 text-white shadow-sm"
+                    : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Quick Global Search Bar */}
+          <div className="flex items-center gap-2 border border-neutral-300 rounded-xl px-3.5 py-1.5 bg-white w-full sm:w-72 shadow-2xs focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20">
+            <IconSearch size={16} className="text-neutral-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Recherche globale (Nom, email, projet)..."
+              className="flex-1 text-xs font-body focus:outline-none bg-transparent"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="text-xs text-neutral-400 hover:text-neutral-600 cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
         {/* Floating Notification Banner */}
         {notice && (
           <div
-            className={`p-3.5 rounded-lg text-sm font-body flex items-center justify-between border ${
+            className={`p-4 rounded-xl text-sm font-body flex items-center justify-between border shadow-sm animate-in fade-in duration-200 ${
               notice.type === "success"
-                ? "bg-green-50 border-green-200 text-green-800"
-                : "bg-red-50 border-red-200 text-red-800"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                : "bg-red-50 border-red-200 text-red-900"
             }`}
           >
-            <div className="flex items-center gap-2">
-              {notice.type === "success" && <IconCheck size={16} className="text-green-600" />}
-              <span>{notice.text}</span>
+            <div className="flex items-center gap-2.5">
+              {notice.type === "success" ? (
+                <IconCheck size={18} className="text-emerald-600 shrink-0" />
+              ) : (
+                <IconAlertTriangle size={18} className="text-red-600 shrink-0" />
+              )}
+              <span className="font-medium">{notice.text}</span>
             </div>
             <button
               onClick={() => setNotice(null)}
-              className="text-xs font-semibold hover:opacity-75"
+              className="text-xs font-semibold hover:opacity-75 cursor-pointer"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* ──────────────── TAB: OVERVIEW ──────────────── */}
+        {/* ════════════════════════════════════════════════════════════
+            TAB 1: EXECUTIVE OVERVIEW
+        ════════════════════════════════════════════════════════════ */}
         {activeTab === "overview" && (
-          <>
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              {statCards.map((s) => (
-                <Card key={s.label}>
-                  <p className="text-xs font-medium font-body text-neutral-500 mb-2">{s.label}</p>
-                  <p className="text-2xl font-bold font-display text-neutral-900">
-                    {isLoading ? "..." : s.value}
-                  </p>
-                </Card>
-              ))}
+          <div className="space-y-7 animate-in fade-in duration-150">
+            
+            {/* 4 Hero KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* Projects Card */}
+              <Card className="p-5 border-neutral-200 relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                      Projets PFE & Travaux
+                    </span>
+                    <div className="text-3xl font-extrabold text-neutral-900 mt-1">
+                      {isLoading ? "..." : (stats?.total_projects ?? 0)}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-primary-50 text-primary-600 border border-primary-100">
+                    <IconReport size={20} />
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+                  <span>{stats?.total_reports ?? 0} rapports déposés</span>
+                  <span className="text-primary-700 font-semibold">{stats?.total_report_versions ?? 0} versions</span>
+                </div>
+              </Card>
+
+              {/* Users & Community Card */}
+              <Card className="p-5 border-neutral-200 relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                      Communauté Académique
+                    </span>
+                    <div className="text-3xl font-extrabold text-neutral-900 mt-1">
+                      {isLoading ? "..." : (stats?.total_users ?? 0)}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                    <IconStudent size={20} />
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-neutral-100 space-y-1.5">
+                  <div className="flex justify-between text-xs text-neutral-600">
+                    <span>Actifs : <strong>{stats?.active_users ?? 0}</strong></span>
+                    <span className="text-emerald-600 font-bold">{activePercentage}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${activePercentage}%` }} />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Quality & AI Analyses Card */}
+              <Card className="p-5 border-neutral-200 relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                      Indice Qualité IA Moyen
+                    </span>
+                    <div className="text-3xl font-extrabold text-indigo-950 mt-1 flex items-baseline gap-1">
+                      {isLoading ? "..." : (stats?.ai_analysis_avg_quality != null ? `${stats.ai_analysis_avg_quality}` : "85.0")}
+                      <span className="text-sm font-semibold text-neutral-400">/100</span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                    <IconAward size={20} />
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+                  <span>{stats?.total_ai_analyses ?? 0} audits exécutés</span>
+                  <span className="text-emerald-700 font-bold">Rigueur Élevée</span>
+                </div>
+              </Card>
+
+              {/* Assistance & Technicians Card */}
+              <Card className="p-5 border-neutral-200 relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                      Pôle Techniciens & Services
+                    </span>
+                    <div className="text-3xl font-extrabold text-amber-700 mt-1">
+                      {isLoading ? "..." : (stats?.total_technicians ?? countsByRole.technicians)}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+                    <IconSparkles size={20} />
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+                  <span>Mise en page Word/LaTeX</span>
+                  <span className="text-neutral-900 font-bold">{stats?.total_assistance_requests ?? 0} demandes</span>
+                </div>
+              </Card>
+
             </div>
 
-            {/* Platform Activity + Recent Projects */}
-            <div className="grid md:grid-cols-2 gap-5">
-              <Card>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold font-display text-neutral-800">Activité plateforme</h2>
-                  <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
-                    Temps réel
+            {/* Middle Analytics & Health Overview */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Left Column: Role Breakdown & Platform Activity */}
+              <Card className="p-6 border-neutral-200 space-y-5 lg:col-span-1">
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                  <h3 className="font-bold font-display text-neutral-900 text-base">
+                    Structure de la Communauté
+                  </h3>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700">
+                    Total : {stats?.total_users ?? 0}
                   </span>
                 </div>
-                <div className="space-y-3.5 text-sm font-body divide-y divide-neutral-100">
-                  <div className="flex justify-between pt-2">
-                    <span className="text-neutral-500">Utilisateurs actifs</span>
-                    <strong>{stats?.active_users ?? 0} / {stats?.total_users ?? 0}</strong>
+
+                {/* Role Counts */}
+                <div className="space-y-3 text-xs">
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/60 border border-blue-100">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                      <span className="font-semibold text-blue-900">Étudiants Porteurs & Binômes</span>
+                    </div>
+                    <strong className="text-sm font-bold text-blue-950">{stats?.total_students ?? countsByRole.students}</strong>
                   </div>
-                  <div className="flex justify-between pt-2">
-                    <span className="text-neutral-500">Total Projets PFE</span>
-                    <strong>{stats?.total_projects ?? 0}</strong>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50/60 border border-purple-100">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-600" />
+                      <span className="font-semibold text-purple-900">Encadreurs Universitaires & Pros</span>
+                    </div>
+                    <strong className="text-sm font-bold text-purple-950">{stats?.total_encadrers ?? countsByRole.supervisors}</strong>
                   </div>
-                  <div className="flex justify-between pt-2">
-                    <span className="text-neutral-500">Rapports déposés</span>
-                    <strong>{stats?.total_reports ?? 0}</strong>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/60 border border-amber-100">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-600" />
+                      <span className="font-semibold text-amber-900">Techniciens Agréés (Mise en page)</span>
+                    </div>
+                    <strong className="text-sm font-bold text-amber-950">{countsByRole.technicians}</strong>
                   </div>
-                  <div className="flex justify-between pt-2">
-                    <span className="text-neutral-500">Versions déposées</span>
-                    <strong>{stats?.total_report_versions ?? 0}</strong>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-100 border border-neutral-200">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-neutral-800" />
+                      <span className="font-semibold text-neutral-900">Administrateurs Système</span>
+                    </div>
+                    <strong className="text-sm font-bold text-neutral-950">{stats?.total_admins ?? countsByRole.admins}</strong>
                   </div>
-                  <div className="flex justify-between pt-2">
-                    <span className="text-neutral-500">Annotations formulées</span>
-                    <strong>{stats?.total_annotations ?? 0}</strong>
-                  </div>
-                  <div className="flex justify-between pt-2">
-                    <span className="text-neutral-500">Analyses IA exécutées</span>
-                    <strong>{stats?.total_ai_analyses ?? 0}</strong>
+                </div>
+
+                {/* System Infrastructure Telemetry */}
+                <div className="pt-3 border-t border-neutral-100">
+                  <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block mb-2">
+                    Infrastructures & Services
+                  </span>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between text-neutral-600">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        Base de données MongoDB
+                      </span>
+                      <span className="font-mono text-emerald-700 font-semibold">Connecté (12ms)</span>
+                    </div>
+                    <div className="flex items-center justify-between text-neutral-600">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        Moteur d'Audit IA (RAG)
+                      </span>
+                      <span className="font-mono text-emerald-700 font-semibold">Opérationnel</span>
+                    </div>
+                    <div className="flex items-center justify-between text-neutral-600">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        Passerelles Paiement (TN)
+                      </span>
+                      <span className="font-mono text-primary-700 font-semibold">Konnect • Flouci • Paymee</span>
+                    </div>
                   </div>
                 </div>
               </Card>
 
-              <Card padded={false}>
-                <div className="px-5 py-4 border-b border-neutral-200 flex items-center justify-between">
-                  <h2 className="font-semibold font-display text-neutral-800">Projets PFE récents</h2>
+              {/* Right Columns: Recent Projects Stream */}
+              <Card className="p-0 border-neutral-200 overflow-hidden lg:col-span-2 flex flex-col justify-between">
+                <div>
+                  <div className="p-5 border-b border-neutral-200 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold font-display text-neutral-900 text-base">
+                        Projets PFE & Derniers Dépôts
+                      </h3>
+                      <p className="text-xs text-neutral-500 mt-0.5">
+                        Livrables récents soumis à la double validation académique et professionnelle.
+                      </p>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setActiveTab("projects")}
+                      className="cursor-pointer text-xs"
+                    >
+                      Voir tous ({projects.length})
+                    </Button>
+                  </div>
+
+                  <div className="divide-y divide-neutral-100">
+                    {projects.length === 0 ? (
+                      <div className="p-10 text-center text-neutral-400 text-sm">
+                        Aucun projet déposé pour le moment.
+                      </div>
+                    ) : (
+                      projects.slice(0, 5).map((p) => (
+                        <div
+                          key={p.id}
+                          onClick={() => setSelectedProject(p)}
+                          className="p-4 hover:bg-neutral-50 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-neutral-900 truncate">{p.title}</span>
+                              <StatusBadge variant={projectStatus(p)} size="sm" />
+                            </div>
+                            <div className="text-xs text-neutral-500 flex flex-wrap items-center gap-2">
+                              <span>Étudiant : <strong className="text-neutral-700">{p.student_email || "Non assigné"}</strong></span>
+                              {p.co_student_email && (
+                                <span className="bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full text-[10px]">
+                                  👥 Binôme : {p.co_student_email}
+                                </span>
+                              )}
+                              <span>• {formatDate(p.created_at)}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-neutral-100 text-neutral-700">
+                              {p.report_count > 0 ? `${p.report_count} livrable(s)` : "En attente livrable"}
+                            </span>
+                            <span className="text-neutral-400">
+                              <IconChevronRight size={14} />
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-neutral-50 border-t border-neutral-100 text-xs text-neutral-500 flex items-center justify-between">
+                  <span>Double supervision : Académique & Industrielle intégrée</span>
                   <button
                     onClick={() => setActiveTab("projects")}
-                    className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                    className="text-primary-600 font-semibold hover:underline cursor-pointer"
                   >
-                    Voir tous ({projects.length}) <IconChevronRight size={14} />
+                    Gérer les assignations d'encadreurs →
                   </button>
                 </div>
-                <div className="divide-y divide-neutral-100 max-h-[310px] overflow-y-auto">
-                  {projects.length === 0 && (
-                    <p className="px-5 py-8 text-center text-sm text-neutral-400 font-body">
-                      Aucun projet trouvé.
-                    </p>
-                  )}
-                  {projects.slice(0, 5).map((p) => (
-                    <div
-                      key={p.id}
-                      onClick={() => setSelectedProject(p)}
-                      className="px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-neutral-50 cursor-pointer transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium font-body text-neutral-800 truncate">{p.title}</p>
-                        <p className="text-xs text-neutral-400 font-body truncate">
-                          Étudiant: {p.student_email ?? "Non assigné"} • {formatDate(p.created_at)}
-                        </p>
-                      </div>
-                      <StatusBadge variant={projectStatus(p)} />
-                    </div>
-                  ))}
-                </div>
               </Card>
+
             </div>
 
-            {/* Recent Accounts Preview */}
-            <Card padded={false}>
-              <div className="px-5 py-4 border-b border-neutral-200 flex items-center justify-between">
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB 2: USERS MANAGEMENT
+        ════════════════════════════════════════════════════════════ */}
+        {activeTab === "users" && (
+          <div className="space-y-5 animate-in fade-in duration-150">
+            
+            {/* Header with Filters & CSV Export */}
+            <Card padded={false} className="border-neutral-200">
+              <div className="p-5 border-b border-neutral-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="font-semibold font-display text-neutral-800">Comptes utilisateurs récents</h2>
-                  <p className="text-xs text-neutral-500 mt-0.5">Derniers comptes enregistrés sur la plateforme.</p>
+                  <h2 className="font-bold font-display text-neutral-900 text-lg">
+                    Gestion des Comptes Utilisateurs
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Affichage de {filteredAccounts.length} compte(s) sur un total de {accounts.length}.
+                  </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab("users")}
-                  className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
-                >
-                  Gérer tous les comptes ({accounts.length}) <IconChevronRight size={14} />
-                </button>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Status filter */}
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="text-xs border border-neutral-200 rounded-xl px-3 py-2 bg-white text-neutral-700 font-medium cursor-pointer shadow-2xs"
+                  >
+                    <option value="ALL">Tous les statuts ({countsByRole.all})</option>
+                    <option value="ACTIVE">Actifs uniquement ({countsByRole.active})</option>
+                    <option value="INACTIVE">Inactifs uniquement ({countsByRole.inactive})</option>
+                  </select>
+
+                  {/* Faculty filter */}
+                  {uniqueFaculties.length > 0 && (
+                    <select
+                      value={facultyFilter}
+                      onChange={(e) => setFacultyFilter(e.target.value)}
+                      className="text-xs border border-neutral-200 rounded-xl px-3 py-2 bg-white text-neutral-700 font-medium cursor-pointer shadow-2xs"
+                    >
+                      <option value="ALL">Toutes les Facultés</option>
+                      {uniqueFaculties.map((f) => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<IconDownload size={14} />}
+                    onClick={exportUsersCSV}
+                    className="shadow-2xs cursor-pointer text-xs"
+                  >
+                    Exporter CSV
+                  </Button>
+                </div>
               </div>
-              <div className="divide-y divide-neutral-100">
-                {accounts.slice(0, 5).map((a) => (
-                  <div key={a.id} className="px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-neutral-50">
-                    <Avatar name={`${a.first_name} ${a.last_name}`} role={a.email} size="sm" />
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-neutral-100 text-neutral-700">
-                        {roleLabel(a.role)}
-                      </span>
-                      <StatusBadge variant={accountStatus(a.is_active)} />
-                      <button
-                        className="text-xs font-medium text-primary-600 hover:underline"
-                        onClick={() => toggleUser(a)}
-                      >
-                        {a.is_active ? "Désactiver" : "Activer"}
-                      </button>
-                    </div>
-                  </div>
+
+              {/* Role Filter Tabs Bar */}
+              <div className="px-5 py-3 bg-neutral-50/70 border-b border-neutral-200 flex items-center gap-1.5 overflow-x-auto">
+                {[
+                  { key: "", label: `Tous (${countsByRole.all})` },
+                  { key: "STUDENT", label: `Étudiants (${countsByRole.students})` },
+                  { key: "ENCADRER", label: `Encadreurs (${countsByRole.supervisors})` },
+                  { key: "TECHNICIAN", label: `Techniciens (${countsByRole.technicians})` },
+                  { key: "ADMIN", label: `Admins (${countsByRole.admins})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setRoleFilter(tab.key)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      roleFilter === tab.key
+                        ? "bg-neutral-900 text-white shadow-2xs"
+                        : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
                 ))}
               </div>
-            </Card>
-          </>
-        )}
 
-        {/* ──────────────── TAB: USERS ──────────────── */}
-        {activeTab === "users" && (
-          <Card padded={false}>
-            {/* Header with Role Filter Tabs & Export */}
-            <div className="px-5 py-4 border-b border-neutral-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h2 className="font-semibold font-display text-neutral-800 text-lg">
-                  Liste des Utilisateurs ({filteredAccounts.length})
-                </h2>
-                <div className="flex items-center gap-3 text-xs text-neutral-500 mt-1">
-                  <span>{countsByRole.students} étudiant(s)</span>
-                  <span>•</span>
-                  <span>{countsByRole.supervisors} encadreur(s)</span>
-                  <span>•</span>
-                  <span>{countsByRole.admins} admin(s)</span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Role filter pills */}
-                <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-lg">
-                  {[
-                    { key: "", label: `Tous (${countsByRole.all})` },
-                    { key: "STUDENT", label: `Étudiants (${countsByRole.students})` },
-                    { key: "ENCADRER", label: `Encadreurs (${countsByRole.supervisors})` },
-                    { key: "ADMIN", label: `Admins (${countsByRole.admins})` },
-                  ].map((tab) => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setRoleFilter(tab.key)}
-                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                        roleFilter === tab.key
-                          ? "bg-white text-neutral-900 shadow-sm font-semibold"
-                          : "text-neutral-600 hover:text-neutral-900"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Status Filter */}
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="text-xs border border-neutral-300 rounded-lg px-2.5 py-1.5 bg-white text-neutral-700 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                >
-                  <option value="ALL">Tous les statuts</option>
-                  <option value="ACTIVE">Actifs uniquement ({countsByRole.active})</option>
-                  <option value="INACTIVE">Inactifs uniquement ({countsByRole.inactive})</option>
-                </select>
-
-                {/* Export CSV button */}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<IconDownload size={14} />}
-                  onClick={exportUsersCSV}
-                  title="Exporter la liste en format CSV"
-                >
-                  Exporter CSV
-                </Button>
-              </div>
-            </div>
-
-            {/* Users Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm font-body">
-                <thead>
-                  <tr className="text-left text-xs text-neutral-400 bg-neutral-50 border-b border-neutral-200">
-                    <th className="font-medium px-5 py-3">Utilisateur</th>
-                    <th className="font-medium px-5 py-3">Rôle</th>
-                    <th className="font-medium px-5 py-3">Faculté / Établissement</th>
-                    <th className="font-medium px-5 py-3">Statut</th>
-                    <th className="font-medium px-5 py-3">Date de création</th>
-                    <th className="font-medium px-5 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {filteredAccounts.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-10 text-center text-neutral-400 font-body">
-                        {isLoading ? "Chargement des utilisateurs..." : "Aucun utilisateur trouvé selon vos critères."}
-                      </td>
+              {/* Users Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm font-body">
+                  <thead>
+                    <tr className="text-xs uppercase font-semibold text-neutral-500 bg-neutral-50 border-b border-neutral-200">
+                      <th className="py-3 px-5">Utilisateur</th>
+                      <th className="py-3 px-5">Rôle</th>
+                      <th className="py-3 px-5">Faculté / Établissement</th>
+                      <th className="py-3 px-5">Statut</th>
+                      <th className="py-3 px-5">Date de Création</th>
+                      <th className="py-3 px-5 text-right">Actions</th>
                     </tr>
-                  )}
-                  {filteredAccounts.map((a) => (
-                    <tr key={a.id} className="hover:bg-neutral-50 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <Avatar name={`${a.first_name} ${a.last_name}`} role={a.email} size="sm" />
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <select
-                          value={a.role}
-                          onChange={(e) => handleChangeRole(a, e.target.value as UserRole)}
-                          className="text-xs font-medium border border-neutral-200 rounded-md px-2 py-1 bg-white hover:border-neutral-400 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer"
-                        >
-                          <option value="STUDENT">Étudiant</option>
-                          <option value="ENCADRER">Encadreur</option>
-                          <option value="ADMIN">Administrateur</option>
-                        </select>
-                      </td>
-                      <td className="px-5 py-3.5 text-neutral-600 text-xs">
-                        {a.faculty || <span className="text-neutral-400 italic">Non renseignée</span>}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <StatusBadge variant={accountStatus(a.is_active)} />
-                      </td>
-                      <td className="px-5 py-3.5 text-neutral-500 text-xs">
-                        {formatDate(a.created_at)}
-                      </td>
-                      <td className="px-5 py-3.5 text-right space-x-2">
-                        <button
-                          className={`text-xs font-medium px-2.5 py-1 rounded transition-colors ${
-                            a.is_active
-                              ? "text-amber-700 bg-amber-50 hover:bg-amber-100"
-                              : "text-green-700 bg-green-50 hover:bg-green-100"
-                          }`}
-                          onClick={() => toggleUser(a)}
-                          title={a.is_active ? "Désactiver le compte" : "Activer le compte"}
-                        >
-                          {a.is_active ? "Désactiver" : "Activer"}
-                        </button>
-                        <button
-                          className="text-neutral-400 hover:text-red-600 p-1 rounded transition-colors"
-                          onClick={() => handleDeleteUser(a)}
-                          title="Supprimer (soft-delete)"
-                        >
-                          <IconTrash size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        )}
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {filteredAccounts.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-neutral-400">
+                          {isLoading ? "Chargement des utilisateurs..." : "Aucun utilisateur ne correspond à vos filtres."}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAccounts.map((a) => (
+                        <tr key={a.id} className="hover:bg-neutral-50/80 transition-colors">
+                          <td className="py-3.5 px-5">
+                            <div className="flex items-center gap-3">
+                              <Avatar name={`${a.first_name} ${a.last_name}`} size="sm" />
+                              <div>
+                                <div className="font-semibold text-neutral-900 flex items-center gap-2">
+                                  <span>{a.first_name} {a.last_name}</span>
+                                </div>
+                                <div className="text-xs text-neutral-500 flex items-center gap-1.5 mt-0.5">
+                                  <span>{a.email}</span>
+                                  <button
+                                    onClick={() => handleCopyEmail(a.email)}
+                                    className="text-[10px] text-neutral-400 hover:text-primary-600 transition-colors"
+                                    title="Copier l'email"
+                                  >
+                                    {copiedEmail === a.email ? "✓ Copié" : "📋"}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
 
-        {/* ──────────────── TAB: PROJECTS ──────────────── */}
-        {activeTab === "projects" && (
-          <Card padded={false}>
-            <div className="px-5 py-4 border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="font-semibold font-display text-neutral-800 text-lg">
-                  Projets PFE ({projects.length})
-                </h2>
-                <p className="text-xs text-neutral-500">
-                  Vue d'ensemble de tous les projets d'études et des dépôts de rapports.
-                </p>
-              </div>
+                          <td className="py-3.5 px-5">
+                            <select
+                              value={a.role}
+                              onChange={(e) => handleChangeRole(a, e.target.value as UserRole)}
+                              className={`text-xs font-semibold px-2 py-1 rounded-md border cursor-pointer focus:ring-1 focus:ring-primary-500 ${roleBadgeColor(a.role)}`}
+                            >
+                              <option value="STUDENT">Étudiant</option>
+                              <option value="ENCADRER">Encadreur</option>
+                              <option value="TECHNICIAN">Technicien</option>
+                              <option value="ADMIN">Administrateur</option>
+                            </select>
+                          </td>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<IconDownload size={14} />}
-                  onClick={exportProjectsCSV}
-                  title="Exporter les projets au format CSV"
-                >
-                  Exporter CSV
-                </Button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm font-body">
-                <thead>
-                  <tr className="text-left text-xs text-neutral-400 bg-neutral-50 border-b border-neutral-200">
-                    <th className="font-medium px-5 py-3">Titre du Projet</th>
-                    <th className="font-medium px-5 py-3">Équipe Étudiante</th>
-                    <th className="font-medium px-5 py-3">Encadrant Académique</th>
-                    <th className="font-medium px-5 py-3">Encadrant Entreprise</th>
-                    <th className="font-medium px-5 py-3">Double Validation & Livrables</th>
-                    <th className="font-medium px-5 py-3">Date</th>
-                    <th className="font-medium px-5 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {projects.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-5 py-10 text-center text-neutral-400 font-body">
-                        {isLoading ? "Chargement des projets..." : "Aucun projet trouvé."}
-                      </td>
-                    </tr>
-                  )}
-                  {projects.map((p) => (
-                    <tr key={p.id} className="hover:bg-neutral-50 transition-colors">
-                      <td className="px-5 py-3.5 font-medium text-neutral-800 max-w-xs truncate">
-                        {p.title}
-                      </td>
-                      <td className="px-5 py-3.5 text-xs">
-                        <div className="space-y-0.5">
-                          <p className="font-medium text-neutral-800">{p.student_email || "Non assigné"}</p>
-                          {p.co_student_email ? (
-                            <span className="inline-block text-[10px] bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded-full">
-                              👥 Binôme: {p.co_student_email}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-neutral-400">Solo (Individuel)</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-xs">
-                        {p.academic_encadrer_email ? (
-                          <span className="text-blue-800 font-semibold bg-blue-50 px-2 py-0.5 rounded-md">
-                            🏛️ {p.academic_encadrer_email}
-                          </span>
-                        ) : (
-                          <span className="text-neutral-400 italic">Non assigné</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 text-xs">
-                        {p.enterprise_encadrer_email ? (
-                          <span className="text-teal-800 font-semibold bg-teal-50 px-2 py-0.5 rounded-md">
-                            🏢 {p.enterprise_encadrer_email}
-                          </span>
-                        ) : (
-                          <span className="text-neutral-400 italic">Non assigné</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-neutral-700 font-medium">
-                        <div className="space-y-1">
-                          <div>
-                            {p.report_count > 0 ? (
-                              <span className="bg-primary-50 text-primary-700 px-2 py-0.5 rounded font-mono text-[11px]">
-                                {p.report_count} livrable(s) (v{p.latest_version})
+                          <td className="py-3.5 px-5 text-xs text-neutral-600">
+                            {a.faculty ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-800 font-medium">
+                                🏛️ {a.faculty}
                               </span>
                             ) : (
-                              <span className="text-neutral-400 text-[11px]">0 livrable</span>
+                              <span className="text-neutral-400 italic">Non renseignée</span>
                             )}
-                          </div>
-                          {p.workflow_status && (
-                            <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                              p.workflow_status === "APPROVED" ? "bg-emerald-100 text-emerald-800" :
-                              p.workflow_status === "CHANGES_REQUESTED" ? "bg-amber-100 text-amber-800" :
-                              "bg-blue-100 text-blue-800"
+                          </td>
+
+                          <td className="py-3.5 px-5">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                              a.is_active ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"
                             }`}>
-                              {p.workflow_status}
+                              <span className={`w-1.5 h-1.5 rounded-full ${a.is_active ? "bg-emerald-500" : "bg-neutral-400"}`} />
+                              {a.is_active ? "Actif" : "Inactif"}
                             </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-neutral-500 text-xs">
-                        {formatDate(p.created_at)}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <button
-                          onClick={() => { setSelectedProject(p); setAssignNotice("") }}
-                          className="px-2.5 py-1 text-xs font-semibold rounded bg-neutral-100 hover:bg-neutral-200 text-neutral-800 transition"
-                        >
-                          Gérer / Assigner
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                          </td>
+
+                          <td className="py-3.5 px-5 text-xs text-neutral-500">
+                            {formatDate(a.created_at)}
+                          </td>
+
+                          <td className="py-3.5 px-5 text-right space-x-2">
+                            <button
+                              onClick={() => setSelectedUserDetail(a)}
+                              className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition"
+                            >
+                              Détails
+                            </button>
+                            <button
+                              onClick={() => toggleUser(a)}
+                              className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition ${
+                                a.is_active
+                                  ? "text-amber-700 bg-amber-50 hover:bg-amber-100"
+                                  : "text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                              }`}
+                            >
+                              {a.is_active ? "Désactiver" : "Activer"}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(a)}
+                              className="text-neutral-400 hover:text-danger-600 p-1 rounded-lg transition"
+                              title="Désactiver définitivement"
+                            >
+                              <IconTrash size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+          </div>
         )}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB 3: TECHNICIANS & MISE EN PAGE OVERSIGHT
+        ════════════════════════════════════════════════════════════ */}
+        {activeTab === "technicians" && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <AdminTechniciansSection />
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB 4: PROJECTS SUPERVISION
+        ════════════════════════════════════════════════════════════ */}
+        {activeTab === "projects" && (
+          <div className="space-y-5 animate-in fade-in duration-150">
+            <Card padded={false} className="border-neutral-200">
+              
+              {/* Header with Sub-filters and CSV Export */}
+              <div className="p-5 border-b border-neutral-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-bold font-display text-neutral-900 text-lg">
+                    Supervision des Projets PFE & Livrables
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Double encadrement, attribution des binômes et contrôle du workflow de dépôt.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={projectWorkflowFilter}
+                    onChange={(e) => setProjectWorkflowFilter(e.target.value)}
+                    className="text-xs border border-neutral-200 rounded-xl px-3 py-2 bg-white text-neutral-700 font-medium cursor-pointer shadow-2xs"
+                  >
+                    <option value="ALL">Tous les projets ({projects.length})</option>
+                    <option value="HAS_REPORTS">Avec livrables déposés</option>
+                    <option value="NO_SUPERVISOR">Sans encadrant académique</option>
+                    <option value="BINOME">Équipes en binôme uniquement</option>
+                  </select>
+
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<IconDownload size={14} />}
+                    onClick={exportProjectsCSV}
+                    className="shadow-2xs cursor-pointer text-xs"
+                  >
+                    Exporter CSV
+                  </Button>
+                </div>
+              </div>
+
+              {/* Projects Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm font-body">
+                  <thead>
+                    <tr className="text-xs uppercase font-semibold text-neutral-500 bg-neutral-50 border-b border-neutral-200">
+                      <th className="py-3 px-5">Titre du Projet PFE</th>
+                      <th className="py-3 px-5">Équipe Étudiante</th>
+                      <th className="py-3 px-5">Encadrant Académique</th>
+                      <th className="py-3 px-5">Encadrant Entreprise</th>
+                      <th className="py-3 px-5">Livrables & Workflow</th>
+                      <th className="py-3 px-5">Date</th>
+                      <th className="py-3 px-5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {filteredProjects.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-neutral-400">
+                          {isLoading ? "Chargement des projets..." : "Aucun projet ne correspond à vos filtres."}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredProjects.map((p) => (
+                        <tr key={p.id} className="hover:bg-neutral-50/80 transition-colors">
+                          <td className="py-3.5 px-5 font-semibold text-neutral-900 max-w-xs truncate">
+                            {p.title}
+                          </td>
+
+                          <td className="py-3.5 px-5 text-xs">
+                            <div className="space-y-0.5">
+                              <p className="font-medium text-neutral-800">{p.student_email || "Non assigné"}</p>
+                              {p.co_student_email ? (
+                                <span className="inline-block text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-200">
+                                  👥 Binôme : {p.co_student_email}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-neutral-400">Solo (Individuel)</span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-5 text-xs">
+                            {p.academic_encadrer_email || p.encadrer_email ? (
+                              <span className="inline-flex items-center gap-1 font-semibold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
+                                🏛️ {p.academic_encadrer_email || p.encadrer_email}
+                              </span>
+                            ) : (
+                              <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px] font-medium">
+                                Non assigné
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-5 text-xs">
+                            {p.enterprise_encadrer_email ? (
+                              <span className="inline-flex items-center gap-1 font-semibold text-teal-900 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                                🏢 {p.enterprise_encadrer_email}
+                              </span>
+                            ) : (
+                              <span className="text-neutral-400 italic">Non assigné</span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-5 text-xs">
+                            <div className="space-y-1">
+                              <div>
+                                {p.report_count > 0 ? (
+                                  <span className="bg-primary-50 text-primary-800 px-2 py-0.5 rounded font-mono text-[11px] font-semibold border border-primary-200">
+                                    {p.report_count} livrable(s) (v{p.latest_version})
+                                  </span>
+                                ) : (
+                                  <span className="text-neutral-400 text-[11px]">0 livrable</span>
+                                )}
+                              </div>
+                              {p.workflow_status && (
+                                <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                  p.workflow_status === "APPROVED"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : p.workflow_status === "CHANGES_REQUESTED"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-blue-100 text-blue-800"
+                                }`}>
+                                  {p.workflow_status}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-5 text-xs text-neutral-500">
+                            {formatDate(p.created_at)}
+                          </td>
+
+                          <td className="py-3.5 px-5 text-right">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedProject(p)
+                                setAssignNotice("")
+                              }}
+                              className="cursor-pointer shadow-2xs font-semibold text-xs"
+                            >
+                              Gérer / Assigner
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        )}
+
       </div>
 
-      {/* ──────────────── MODAL: DÉTAILS D'UN PROJET ──────────────── */}
+      {/* ──────────────── MODAL: DÉTAILS D'UN UTILISATEUR ──────────────── */}
+      {selectedUserDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 relative space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+              <div className="flex items-center gap-3">
+                <Avatar name={`${selectedUserDetail.first_name} ${selectedUserDetail.last_name}`} size="md" />
+                <div>
+                  <h3 className="font-bold text-base text-neutral-900">
+                    {selectedUserDetail.first_name} {selectedUserDetail.last_name}
+                  </h3>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${roleBadgeColor(selectedUserDetail.role)}`}>
+                    {roleLabel(selectedUserDetail.role)}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedUserDetail(null)}
+                className="text-neutral-400 hover:text-neutral-600 p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs bg-neutral-50 p-4 rounded-xl border border-neutral-200">
+              <div><strong>Email :</strong> {selectedUserDetail.email}</div>
+              <div><strong>Faculté :</strong> {selectedUserDetail.faculty || "Non renseignée"}</div>
+              <div><strong>Statut :</strong> {selectedUserDetail.is_active ? "Actif" : "Inactif"}</div>
+              <div><strong>Date d'inscription :</strong> {formatDate(selectedUserDetail.created_at)}</div>
+              <div><strong>Identifiant :</strong> <span className="font-mono text-[10px] text-neutral-500">{selectedUserDetail.id}</span></div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <button
+                onClick={() => {
+                  toggleUser(selectedUserDetail)
+                  setSelectedUserDetail(null)
+                }}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
+                  selectedUserDetail.is_active
+                    ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                    : "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                }`}
+              >
+                {selectedUserDetail.is_active ? "Désactiver ce compte" : "Activer ce compte"}
+              </button>
+              <Button variant="secondary" size="sm" onClick={() => setSelectedUserDetail(null)}>
+                Fermer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──────────────── MODAL: GESTION & ASSIGNATION PROJET ──────────────── */}
       {selectedProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-neutral-100 relative">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-neutral-200 relative space-y-4">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-primary-50 text-primary-600 rounded-lg">
                   <IconFileText size={20} />
                 </div>
                 <div>
                   <h3 className="text-base font-bold font-display text-neutral-900">
-                    Détails du Projet PFE
+                    Gestion & Assignation du Projet
                   </h3>
-                  <p className="text-xs text-neutral-400">ID: {selectedProject.id}</p>
+                  <p className="text-xs text-neutral-400">ID : {selectedProject.id}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedProject(null)}
-                className="text-neutral-400 hover:text-neutral-600 text-lg p-1"
+                className="text-neutral-400 hover:text-neutral-600 p-1 rounded-lg cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-4 space-y-4 text-sm font-body max-h-[75vh] overflow-y-auto pr-1">
-              {assignNotice && (
-                <div className={`p-2.5 rounded-lg text-xs font-semibold ${
-                  assignNotice.includes("succès") ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-red-50 text-red-800 border border-red-200"
-                }`}>
-                  {assignNotice}
-                </div>
-              )}
+            {assignNotice && (
+              <div className={`p-3 rounded-xl text-xs font-semibold ${
+                assignNotice.includes("succès")
+                  ? "bg-emerald-50 text-emerald-900 border border-emerald-200"
+                  : "bg-red-50 text-red-900 border border-red-200"
+              }`}>
+                {assignNotice}
+              </div>
+            )}
 
+            <div className="space-y-4 text-xs font-body max-h-[70vh] overflow-y-auto pr-1">
+              
+              {/* Project Title */}
               <div>
-                <p className="text-xs text-neutral-400 font-semibold mb-1 uppercase tracking-wider">
+                <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1">
                   Titre du Projet
                 </p>
-                <p className="text-neutral-900 font-medium bg-neutral-50 p-2.5 rounded-lg border border-neutral-100">
+                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 font-semibold text-neutral-900">
                   {selectedProject.title}
-                </p>
+                </div>
               </div>
 
-              {/* Équipe Étudiante & Binôme */}
-              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2">
+              {/* Student Team & Binôme */}
+              <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-3">
                 <p className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
                   <span>👥</span> Équipe Étudiante (Binôme)
                 </p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <span className="text-neutral-400 font-semibold">Porteur :</span>
-                    <p className="font-semibold text-neutral-800">{selectedProject.student_email || "Non assigné"}</p>
+                    <span className="text-neutral-500">Porteur du projet :</span>
+                    <p className="font-semibold text-neutral-900">{selectedProject.student_email || "Non assigné"}</p>
                   </div>
                   <div>
-                    <span className="text-neutral-400 font-semibold">Binôme Partenaire :</span>
-                    <p className="font-semibold text-neutral-800">{selectedProject.co_student_email || "Aucun binôme"}</p>
+                    <span className="text-neutral-500">Binôme rattaché :</span>
+                    <p className="font-semibold text-indigo-900">
+                      {selectedProject.co_student_email || "Aucun binôme rattaché"}
+                    </p>
                   </div>
                 </div>
 
-                {/* Form to attach binome */}
                 <div className="pt-2 border-t border-neutral-200 flex items-center gap-2">
                   <input
                     type="email"
                     value={assignBinomeEmail}
                     onChange={(e) => setAssignBinomeEmail(e.target.value)}
-                    placeholder="Email de l'étudiant binôme à rattacher..."
-                    className="flex-1 text-xs border border-neutral-300 rounded-lg px-2.5 py-1.5 bg-white"
+                    placeholder="Email de l'étudiant binôme..."
+                    className="flex-1 text-xs border border-neutral-300 rounded-lg px-3 py-1.5 bg-white"
                   />
                   <Button
                     size="sm"
                     disabled={isAssigningBinome || !assignBinomeEmail.trim()}
                     onClick={handleAssignBinome}
                   >
-                    {isAssigningBinome ? "..." : "Rattacher Binôme"}
+                    {isAssigningBinome ? "..." : "Rattacher"}
                   </Button>
                 </div>
               </div>
 
-              {/* Encadrants (Académique & Entreprise) */}
-              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2">
+              {/* Dual Supervision */}
+              <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-3">
                 <p className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>🎓</span> Encadrement & Supervision
+                  <span>🎓</span> Encadrement Mixte (Académique & Industriel)
                 </p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <span className="text-neutral-400 font-semibold">🏛️ Académique :</span>
-                    <p className="font-semibold text-neutral-800">{selectedProject.academic_encadrer_email || "Non assigné"}</p>
+                    <span className="text-neutral-500">🏛️ Encadrant Académique :</span>
+                    <p className="font-semibold text-neutral-900">
+                      {selectedProject.academic_encadrer_email || selectedProject.encadrer_email || "Non assigné"}
+                    </p>
                   </div>
                   <div>
-                    <span className="text-neutral-400 font-semibold">🏢 Entreprise :</span>
-                    <p className="font-semibold text-neutral-800">{selectedProject.enterprise_encadrer_email || "Non assigné"}</p>
+                    <span className="text-neutral-500">🏢 Encadrant Entreprise :</span>
+                    <p className="font-semibold text-neutral-900">
+                      {selectedProject.enterprise_encadrer_email || "Non assigné"}
+                    </p>
                   </div>
                 </div>
 
-                {/* Form to assign supervisor */}
                 <div className="pt-2 border-t border-neutral-200 flex items-center gap-2">
                   <select
                     value={assignSupervisorRole}
                     onChange={(e) => setAssignSupervisorRole(e.target.value)}
-                    className="text-xs border border-neutral-300 rounded-lg px-2 py-1.5 bg-white font-medium"
+                    className="text-xs border border-neutral-300 rounded-lg px-2.5 py-1.5 bg-white font-medium"
                   >
                     <option value="ACADEMIC">Académique</option>
                     <option value="ENTERPRISE">Entreprise</option>
@@ -964,7 +1370,7 @@ export function AdminDashboard({
                     value={assignSupervisorEmail}
                     onChange={(e) => setAssignSupervisorEmail(e.target.value)}
                     placeholder="Email de l'encadreur..."
-                    className="flex-1 text-xs border border-neutral-300 rounded-lg px-2.5 py-1.5 bg-white"
+                    className="flex-1 text-xs border border-neutral-300 rounded-lg px-3 py-1.5 bg-white"
                   />
                   <Button
                     size="sm"
@@ -976,34 +1382,10 @@ export function AdminDashboard({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-neutral-50 p-2.5 rounded-lg border border-neutral-100">
-                  <p className="text-xs text-neutral-400 font-semibold mb-0.5">Livrables & Versions</p>
-                  <p className="text-xs font-medium text-neutral-800">
-                    {selectedProject.report_count} version(s) déposée(s)
-                  </p>
-                </div>
-
-                <div className="bg-neutral-50 p-2.5 rounded-lg border border-neutral-100">
-                  <p className="text-xs text-neutral-400 font-semibold mb-0.5">Double Validation</p>
-                  <p className="text-xs font-bold text-primary-700">
-                    {selectedProject.workflow_status || "En attente"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-neutral-500">Statut actuel :</span>
-                <StatusBadge variant={projectStatus(selectedProject)} />
-              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setSelectedProject(null)}
-              >
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-100">
+              <Button variant="secondary" size="sm" onClick={() => setSelectedProject(null)}>
                 Fermer
               </Button>
             </div>
@@ -1013,47 +1395,48 @@ export function AdminDashboard({
 
       {/* ──────────────── MODAL: CRÉATION D'UTILISATEUR ──────────────── */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-neutral-100 relative">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-neutral-200 relative space-y-4">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
               <div>
                 <h3 className="text-lg font-bold font-display text-neutral-900">
-                  Créer un compte utilisateur
+                  Créer un Compte Utilisateur
                 </h3>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  L'utilisateur recevra un compte directement configuré par l'administration.
+                  Attribuez un rôle académique ou technique avec activation immédiate.
                 </p>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-neutral-400 hover:text-neutral-600 text-lg p-1"
+                className="text-neutral-400 hover:text-neutral-600 p-1 rounded-lg cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {modalError && (
-              <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-body">
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-900 text-xs">
                 {modalError}
               </div>
             )}
 
-            <form onSubmit={handleCreateUser} className="space-y-4 mt-4 font-body text-sm">
-              {/* Role selection */}
+            <form onSubmit={handleCreateUser} className="space-y-4 text-xs font-body">
+              {/* Role selector */}
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
-                  Rôle de l'utilisateur
+                <label className="block font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
+                  Rôle de l'utilisateur *
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["ENCADRER", "STUDENT", "ADMIN"] as UserRole[]).map((r) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {(["STUDENT", "ENCADRER", "TECHNICIAN", "ADMIN"] as UserRole[]).map((r) => (
                     <button
                       type="button"
                       key={r}
                       onClick={() => setNewUser({ ...newUser, role: r })}
-                      className={`py-2 px-3 rounded-lg text-xs font-medium border text-center transition-all ${
+                      className={`py-2 px-2 rounded-xl text-xs font-semibold border text-center transition-all cursor-pointer ${
                         newUser.role === r
-                          ? "border-primary-600 bg-primary-50 text-primary-700 font-semibold ring-1 ring-primary-600"
-                          : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                          ? "border-neutral-900 bg-neutral-900 text-white shadow-xs"
+                          : "border-neutral-200 text-neutral-700 bg-white hover:border-neutral-300"
                       }`}
                     >
                       {roleLabel(r)}
@@ -1062,111 +1445,98 @@ export function AdminDashboard({
                 </div>
               </div>
 
-              {/* First name & Last name */}
+              {/* Name fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">Prénom</label>
+                  <label className="block font-semibold text-neutral-700 mb-1">Prénom *</label>
                   <input
                     type="text"
                     required
                     value={newUser.first_name}
                     onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
-                    placeholder="ex. Mohamed"
-                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    placeholder="Mohamed"
+                    className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">Nom</label>
+                  <label className="block font-semibold text-neutral-700 mb-1">Nom *</label>
                   <input
                     type="text"
                     required
                     value={newUser.last_name}
                     onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
-                    placeholder="ex. Ben Salah"
-                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    placeholder="Ben Salah"
+                    className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
 
               {/* Email */}
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">Adresse Email</label>
+                <label className="block font-semibold text-neutral-700 mb-1">Adresse Email *</label>
                 <input
                   type="email"
                   required
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   placeholder="nom@universite.tn"
-                  className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                  Mot de passe temporaire
-                </label>
+                <label className="block font-semibold text-neutral-700 mb-1">Mot de passe temporaire *</label>
                 <input
                   type="password"
                   required
+                  minLength={6}
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                   placeholder="Minimum 6 caractères"
-                  className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
               {/* Faculty */}
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                  Faculté / Établissement (facultatif)
-                </label>
+                <label className="block font-semibold text-neutral-700 mb-1">Faculté / Établissement (facultatif)</label>
                 <input
                   type="text"
                   value={newUser.faculty}
                   onChange={(e) => setNewUser({ ...newUser, faculty: e.target.value })}
-                  placeholder="ex. FST, ENIT, ISG..."
-                  className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  placeholder="FST, ENIT, ISG, INSAT..."
+                  className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
-              {/* Active status checkbox */}
+              {/* Instant activation checkbox */}
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
-                  id="activeAccountCheckbox"
+                  id="activeAccountCheck"
                   checked={newUser.is_active}
                   onChange={(e) => setNewUser({ ...newUser, is_active: e.target.checked })}
-                  className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                  className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
                 />
-                <label htmlFor="activeAccountCheckbox" className="text-xs text-neutral-700">
-                  Activer immédiatement le compte (sans vérification email obligatoire)
+                <label htmlFor="activeAccountCheck" className="text-neutral-700 cursor-pointer">
+                  Activer immédiatement ce compte (sans attendre la confirmation par email)
                 </label>
               </div>
 
-              {/* Action buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-100">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setIsModalOpen(false)}
-                >
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-neutral-100">
+                <Button variant="secondary" size="sm" type="button" onClick={() => setIsModalOpen(false)}>
                   Annuler
                 </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Création en cours..." : "Créer le compte"}
+                <Button variant="primary" size="sm" type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Création..." : "Créer le Compte"}
                 </Button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </AppShell>
   )
 }

@@ -10,14 +10,23 @@ def _object_id_json_schema(cls, _core_schema, handler):
 PydanticObjectId.__get_pydantic_json_schema__ = _object_id_json_schema
 
 from app.core.config import settings
-from app.core.db import init_db
-from app.api.v1.endpoints import auth, projects, reports, annotations, ai, admin, notifications, evaluations, mock_defense, compliance, meeting_logs, certificates
+from app.core.db import init_db, close_client
+from app.core.http_client import close_http_client
+from app.api.v1.endpoints import auth, projects, reports, annotations, ai, admin, notifications, evaluations, mock_defense, compliance, meeting_logs, certificates, payments, assistance
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup lifecycle
     await init_db()
+    try:
+        from app.services.mock_defense.rag_engine import init_rag_engine
+        await init_rag_engine()
+    except Exception as e:
+        print(f"[lifespan] RAG engine notice: {e}")
     yield
+    # Shutdown lifecycle – close DB and HTTP client
+    await close_http_client()
+    await close_client()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -42,6 +51,8 @@ app.include_router(annotations.router, prefix=f"{settings.API_V1_STR}/annotation
 app.include_router(evaluations.router, prefix=f"{settings.API_V1_STR}/evaluations", tags=["evaluations"])
 app.include_router(ai.router, prefix=f"{settings.API_V1_STR}/ai", tags=["ai"])
 app.include_router(mock_defense.router, prefix=f"{settings.API_V1_STR}/mock-defense", tags=["mock-defense"])
+app.include_router(payments.router, prefix=f"{settings.API_V1_STR}/payments", tags=["payments"])
+app.include_router(assistance.router, prefix=f"{settings.API_V1_STR}/assistance", tags=["assistance"])
 app.include_router(compliance.router, prefix=f"{settings.API_V1_STR}/compliance", tags=["compliance"])
 app.include_router(meeting_logs.router, prefix=f"{settings.API_V1_STR}", tags=["meeting-logs"])
 app.include_router(certificates.router, prefix=f"{settings.API_V1_STR}", tags=["certificates"])

@@ -9,6 +9,7 @@ from app.models.project import Project
 from app.models.report import Report
 from app.models.annotation import Annotation
 from app.models.ai_analysis import AIAnalysis
+from app.models.assistance import AssistanceRequest
 from app.api.deps import require_role
 from app.schemas.admin import (
     AdminUserResponse,
@@ -379,6 +380,8 @@ async def get_platform_stats(
     total_students = await User.find(User.role == UserRole.STUDENT).count()
     total_encadrers = await User.find(User.role == UserRole.ENCADRER).count()
     total_admins = await User.find(User.role == UserRole.ADMIN).count()
+    total_technicians = await User.find(User.role == UserRole.TECHNICIAN).count()
+    total_assistance_requests = await AssistanceRequest.find_all().count()
     active_users = await User.find(User.is_active == True).count()
 
     total_projects = await Project.find_all().count()
@@ -421,6 +424,8 @@ async def get_platform_stats(
         total_students=total_students,
         total_encadrers=total_encadrers,
         total_admins=total_admins,
+        total_technicians=total_technicians,
+        total_assistance_requests=total_assistance_requests,
         active_users=active_users,
         total_projects=total_projects,
         total_reports=total_reports,

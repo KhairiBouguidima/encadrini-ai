@@ -10,6 +10,7 @@ import {
 } from "../../components/ui/Icons"
 import { api, type ReportHistory, type User } from "../../lib/api"
 import { STUDENT_NAV_ITEMS } from "../../lib/navItems"
+import { RequestAssistanceModal } from "./RequestAssistanceModal"
 
 const REPORT_TYPES = [
   { key: "PFE", label: "Rapport PFE", color: "bg-primary-50 text-primary-700 border-primary-200" },
@@ -70,6 +71,7 @@ export function StudentReportsPage({
 
   // Add Report Modal
   const [isAddReportOpen, setIsAddReportOpen] = useState(false)
+  const [isAssistanceModalOpen, setIsAssistanceModalOpen] = useState(false)
   const [reportTitle, setReportTitle] = useState("")
   const [reportType, setReportType] = useState("PFE")
   const [reportDescription, setReportDescription] = useState("")
@@ -210,14 +212,26 @@ export function StudentReportsPage({
             </p>
           </div>
 
-          <Button
-            size="md"
-            icon={<IconPlus size={16} />}
-            onClick={() => setIsAddReportOpen(true)}
-            className="shadow-sm"
-          >
-            Ajouter un rapport
-          </Button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              size="md"
+              variant="secondary"
+              onClick={() => setIsAssistanceModalOpen(true)}
+              className="border-primary-200 text-primary-800 bg-primary-50/60 hover:bg-primary-100/70 cursor-pointer shadow-xs font-semibold"
+            >
+              <IconSparkles size={16} className="text-primary-600" />
+              Aide Mise en Page (Word / LaTeX)
+            </Button>
+
+            <Button
+              size="md"
+              icon={<IconPlus size={16} />}
+              onClick={() => setIsAddReportOpen(true)}
+              className="shadow-sm cursor-pointer"
+            >
+              Ajouter un rapport
+            </Button>
+          </div>
         </div>
 
         {/* ── FILTRES & RECHERCHE ── */}
@@ -550,6 +564,17 @@ export function StudentReportsPage({
             </div>
           </div>
         )}
+        {/* ── MODAL: ASSISTANCE MISE EN PAGE TECHNICIEN ── */}
+        <RequestAssistanceModal
+          isOpen={isAssistanceModalOpen}
+          onClose={() => setIsAssistanceModalOpen(false)}
+          reportTitle={reports[0]?.title || "Mon Rapport PFE"}
+          reportId={reports[0]?.id}
+          projectId={reports[0]?.project_id}
+          onSuccess={(req) => {
+            setNotice(`Votre demande d'aide mise en page pour « ${req.report_title} » a été enregistrée avec succès. Un technicien va s'en charger !`)
+          }}
+        />
       </div>
     </AppShell>
   )

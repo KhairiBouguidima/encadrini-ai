@@ -80,6 +80,8 @@ class PlatformStats(BaseModel):
     total_students: int
     total_encadrers: int
     total_admins: int
+    total_technicians: int = 0
+    total_assistance_requests: int = 0
     active_users: int
     total_projects: int
     total_reports: int

@@ -50,6 +50,31 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = ""
     SMTP_USE_TLS: bool = True
 
+    # Tunisian Payment Gateways Configuration
+    PREMIUM_PRICE_TND: float = 25.0
+
+    # 1. Konnect (https://konnect.network)
+    KONNECT_API_KEY: str = ""
+    KONNECT_WALLET_ID: str = ""
+    KONNECT_MODE: str = "sandbox"  # "sandbox" | "production"
+
+    # 2. Flouci (https://developer.flouci.com)
+    FLOUCI_APP_PUBLIC_KEY: str = ""
+    FLOUCI_APP_SECRET: str = ""
+
+    # 3. Paymee (https://paymee.tn)
+    PAYMEE_API_KEY: str = ""
+    PAYMEE_VENDOR_ID: str = ""
+    PAYMEE_MODE: str = "sandbox"  # "sandbox" | "production"
+
+    # RAG & Semantic Retrieval Configuration
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: str = ""
+    QDRANT_COLLECTION: str = "pfe_knowledge_chunks"
+    EMBED_MODEL: str = "BAAI/bge-m3"
+    EMBED_DEVICE: str = "cpu"
+    RAG_TOP_K: int = 5
+
     model_config = SettingsConfigDict(
         env_file=(
             os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"),

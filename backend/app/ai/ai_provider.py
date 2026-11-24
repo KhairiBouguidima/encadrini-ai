@@ -2,8 +2,9 @@ import json
 import re
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
-import requests
-from app.core.config import settings
+
+from app.core.http_client import get_http_client
+import httpx
 
 
 class BaseAIProvider(ABC):
@@ -324,9 +325,11 @@ class OpenAICompatibleProvider(BaseAIProvider):
         if api_key and api_key not in ["", "sk-fake-key-for-dev"]:
             doc_sample = text_content[:12000]
             prompt = ANALYSIS_PROMPT_TEMPLATE.format(doc_sample=doc_sample)
+            # Remote LLM call
+            print(f"[ai-provider] Calling {self.api_base} with model {self.model}...", flush=True)
             try:
-                print(f"[ai-provider] Calling {self.api_base} with model {self.model}...", flush=True)
-                response = requests.post(
+                client = get_http_client()
+                response = await client.post(
                     f"{self.api_base}/chat/completions",
                     headers={
                         "Authorization": f"Bearer {api_key}",
@@ -337,7 +340,6 @@ class OpenAICompatibleProvider(BaseAIProvider):
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.3,
                     },
-                    timeout=30,
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -352,8 +354,11 @@ class OpenAICompatibleProvider(BaseAIProvider):
                     return result
                 else:
                     print(f"[ai-provider] LLM API returned status {response.status_code}: {response.text[:200]}", flush=True)
-            except Exception as e:
+            except httpx.RequestError as e:
                 print(f"[ai-provider] LLM request error: {e}", flush=True)
+            except Exception as e:
+                print(f"[ai-provider] Unexpected error: {e}", flush=True)
+
 
         # Fallback to content-driven dynamic analyzer
         print("[ai-provider] Generating context-aware analysis from document text...", flush=True)

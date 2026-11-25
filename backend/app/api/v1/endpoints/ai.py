@@ -18,6 +18,7 @@ async def get_ai_analysis(
     report_id: PydanticObjectId,
     version_number: int,
     background_tasks: BackgroundTasks,
+    force: bool = False,
     current_user: User = Depends(get_current_user)
 ):
     """Fetch the AI analysis results for a specific report version."""
@@ -42,13 +43,13 @@ async def get_ai_analysis(
     if not version:
         raise HTTPException(status_code=404, detail=f"Version {version_number} not found.")
 
-    analysis = await AIAnalysis.find_one(
+    analysis = None if force else await AIAnalysis.find_one(
         AIAnalysis.report_id == report.id,
         AIAnalysis.version_number == version_number
     )
     if not analysis:
-        # Automatically trigger background analysis if not already running
-        if version.ai_analysis_status != AIAnalysisStatus.PROCESSING:
+        # Automatically trigger background analysis if not already running (or if forced)
+        if force or version.ai_analysis_status != AIAnalysisStatus.PROCESSING:
             background_tasks.add_task(run_ai_analysis, str(report.id), version_number)
             version.ai_analysis_status = AIAnalysisStatus.PROCESSING
             await report.save()

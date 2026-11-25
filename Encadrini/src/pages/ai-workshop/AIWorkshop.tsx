@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { AppShell } from "../../components/layout/AppShell"
 import { Card } from "../../components/ui/Primitives"
 import { Button } from "../../components/ui/Button"
-import { IconReport, IconSparkles, IconSend, IconCheck, IconBell, IconUser, IconAward, IconStats, IconStudent } from "../../components/ui/Icons"
+import { IconSparkles, IconSend, IconCheck } from "../../components/ui/Icons"
 import { api, type AIAnalysisResponse, type User } from "../../lib/api"
 import { getNavItems } from "../../lib/navItems"
 
@@ -61,23 +61,70 @@ export function AIWorkshop({
 
   const navItems = useMemo(() => getNavItems(user?.role), [user?.role])
 
+  const [isRetrying, setIsRetrying] = useState(false)
+
   useEffect(() => {
     let isMounted = true
-    const fetchAnalysis = async () => {
+    let pollTimer: ReturnType<typeof setTimeout> | null = null
+
+    const fetchAnalysis = async (force = false) => {
       if (!reportId || !versionNumber) { setIsLoading(false); return }
-      setIsLoading(true)
+      if (!analysis && !force) setIsLoading(true)
       try {
-        const data = await api.getAIAnalysis(reportId, versionNumber)
-        if (isMounted) setAnalysis(data)
+        const data = await api.getAIAnalysis(reportId, versionNumber, force)
+        if (isMounted) {
+          setAnalysis(data)
+          setError("")
+          if (data.status === "COMPLETED" || data.status === "FAILED") {
+            setIsRetrying(false)
+          }
+          // Auto-poll every 2s while still processing for fast turnaround
+          if (data.status === "PROCESSING" || data.status === "PENDING") {
+            pollTimer = setTimeout(() => fetchAnalysis(false), 2000)
+          }
+        }
       } catch (err) {
-        if (isMounted) setError(err instanceof Error ? err.message : "Erreur de chargement.")
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Erreur de chargement.")
+          setIsRetrying(false)
+        }
       } finally {
         if (isMounted) setIsLoading(false)
       }
     }
-    fetchAnalysis()
-    return () => { isMounted = false }
+    fetchAnalysis(false)
+    return () => {
+      isMounted = false
+      if (pollTimer) clearTimeout(pollTimer)
+    }
   }, [reportId, versionNumber])
+
+  const handleReanalyze = async () => {
+    if (!reportId || !versionNumber || isRetrying) return
+    setIsRetrying(true)
+    setError("")
+    try {
+      const data = await api.getAIAnalysis(reportId, versionNumber, true)
+      setAnalysis(data)
+      if (data.status === "PROCESSING" || data.status === "PENDING") {
+        const poll = async () => {
+          const next = await api.getAIAnalysis(reportId, versionNumber, false)
+          setAnalysis(next)
+          if (next.status === "PROCESSING" || next.status === "PENDING") {
+            setTimeout(poll, 2000)
+          } else {
+            setIsRetrying(false)
+          }
+        }
+        setTimeout(poll, 2000)
+      } else {
+        setIsRetrying(false)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de la relance.")
+      setIsRetrying(false)
+    }
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -141,12 +188,25 @@ export function AIWorkshop({
     >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold font-display text-neutral-900 flex items-center gap-2">
-            <IconSparkles size={22} className="text-ai-600" />
-            Atelier IA
-          </h1>
-          <p className="text-sm text-neutral-500 font-body mt-1">Version {versionNumber}</p>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold font-display text-neutral-900 flex items-center gap-2">
+              <IconSparkles size={22} className="text-ai-600" />
+              Atelier IA
+            </h1>
+            <p className="text-sm text-neutral-500 font-body mt-1">Version {versionNumber}</p>
+          </div>
+          {reportId && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleReanalyze}
+              disabled={isRetrying}
+              icon={<IconSparkles size={14} />}
+            >
+              {isRetrying ? "Analyse en cours…" : "Relancer l'analyse"}
+            </Button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -183,9 +243,9 @@ export function AIWorkshop({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-4 mb-4">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold font-display text-neutral-900 text-lg">Indice de Maturité (Readiness Score)</h3>
+                          <h3 className="font-bold font-display text-neutral-900 text-lg">Indice de Maturité du Rapport</h3>
                           <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-primary-100 text-primary-800 border border-primary-200">
-                            PFE Guide Spec v1.0
+                            Guide PFE v1.0
                           </span>
                         </div>
                         <p className="text-xs text-neutral-500 font-body mt-1">
@@ -195,7 +255,7 @@ export function AIWorkshop({
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <div className="text-3xl font-extrabold font-display text-primary-700">
-                            {analysis.readiness_score ?? analysis.scores?.overall_quality ?? 0}/100
+                            {Math.round(analysis.readiness_score ?? analysis.scores?.overall_quality ?? 0)}/100
                           </div>
                           <span className={`inline-block text-xs font-bold px-2.5 py-0.5 rounded-full border ${
                             (analysis.readiness_score ?? 0) >= 90
@@ -254,7 +314,7 @@ export function AIWorkshop({
                     <div className="flex items-center justify-between mb-4 border-b border-neutral-100 pb-3">
                       <div>
                         <h3 className="font-semibold font-display text-neutral-800 flex items-center gap-2">
-                          🗺️ Feuille de Route d'Amélioration (Improvement Roadmap)
+                          🗺️ Feuille de Route d'Amélioration
                         </h3>
                         <p className="text-xs text-neutral-500 font-body mt-0.5">
                           Actions prioritaires classées par gain estimé pour maximiser votre note de soutenance.
@@ -292,7 +352,14 @@ export function AIWorkshop({
                               </div>
                               <p className="text-xs text-neutral-600 font-body mb-2 leading-relaxed">{act.description}</p>
                               <div className="flex items-center justify-between text-[11px] text-neutral-400 font-body pt-2 border-t border-neutral-200/60">
-                                <span>Dimension : <strong className="text-neutral-700 capitalize">{act.dimension}</strong></span>
+                                <span>Dimension : <strong className="text-neutral-700">{
+                                  act.dimension === "structure" ? "Structure" :
+                                  act.dimension === "methodology" ? "Méthodologie" :
+                                  act.dimension === "language" ? "Langue" :
+                                  act.dimension === "formatting" ? "Mise en page" :
+                                  act.dimension === "citations" ? "Citations" :
+                                  act.dimension
+                                }</strong></span>
                                 <span>Effort estimé : <strong className="text-neutral-700">{act.estimated_effort}</strong></span>
                               </div>
                             </div>
@@ -304,9 +371,16 @@ export function AIWorkshop({
                     </div>
                   </Card>
 
-                  {/* Corrections */}
+                  {/* Corrections (Erreurs de langue & Style) */}
                   <Card>
-                    <h3 className="font-semibold font-display text-neutral-800 mb-3">Suggestions & Corrections</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold font-display text-neutral-800">
+                        ✍️ Erreurs de langue, orthographe & style
+                      </h3>
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-ai-50 text-ai-700 border border-ai-200">
+                        {analysis.corrections?.length ?? 0} remarque{(analysis.corrections?.length ?? 0) > 1 ? "s" : ""}
+                      </span>
+                    </div>
                     <div className="space-y-3">
                       {analysis.corrections?.map((c, idx) => (
                         <div key={idx} className="border border-neutral-200 rounded-lg p-3 bg-neutral-50">
@@ -351,7 +425,7 @@ export function AIWorkshop({
                 <Card padded={false} className="flex flex-col">
                   <div className="px-4 py-3 border-b border-neutral-200 flex items-center gap-2">
                     <IconSparkles size={16} className="text-ai-600" />
-                    <h2 className="font-semibold font-display text-neutral-800 text-sm">Généré par l'IA (PFE Assistant)</h2>
+                    <h2 className="font-semibold font-display text-neutral-800 text-sm">Contenu généré par l'IA</h2>
                   </div>
                   <div className="flex-1 overflow-y-auto p-5 space-y-5">
                     <div>
@@ -361,7 +435,7 @@ export function AIWorkshop({
                       </p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2">Abstract (Anglais)</h3>
+                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2">Résumé en anglais (Abstract)</h3>
                       <p className="text-sm font-body text-neutral-500 leading-relaxed italic">
                         {analysis.generated_content?.abstract || "Non disponible"}
                       </p>
@@ -377,9 +451,14 @@ export function AIWorkshop({
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold font-display text-neutral-800 mb-2 flex items-center gap-1.5 text-amber-800">
-                        📐 Remarques & Défauts de mise en forme
-                      </h3>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold font-display text-amber-800 flex items-center gap-1.5">
+                          📐 Erreurs de mise en page & typographie
+                        </h3>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          {analysis.generated_content?.formatting_issues?.length ?? 0}
+                        </span>
+                      </div>
                       {analysis.generated_content?.formatting_issues && analysis.generated_content.formatting_issues.length > 0 ? (
                         <div className="space-y-2 bg-amber-50/60 p-3 rounded-xl border border-amber-200/80">
                           {analysis.generated_content.formatting_issues.map((issue, i) => (
@@ -410,14 +489,39 @@ export function AIWorkshop({
               </div>
             ) : (
               !isLoading && !error && (
-                <div className="text-center py-16">
-                  <div className="w-16 h-16 rounded-full bg-ai-100 flex items-center justify-center mx-auto mb-4 animate-pulse">
-                    <IconSparkles size={28} className="text-ai-600" />
+                <div className="text-center py-16 max-w-md mx-auto">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-ai-100 to-primary-100 flex items-center justify-center mx-auto mb-5 animate-pulse shadow-sm">
+                    <IconSparkles size={32} className="text-ai-600" />
                   </div>
-                  <p className="text-neutral-600 font-body">
-                    L'analyse IA est en cours… Les résultats apparaîtront ici automatiquement.
+                  <h3 className="text-lg font-semibold font-display text-neutral-800 mb-2">
+                    {analysis?.status === "FAILED" ? "L'analyse a échoué" : "Analyse en cours…"}
+                  </h3>
+                  <p className="text-sm text-neutral-500 font-body leading-relaxed mb-4">
+                    {analysis?.status === "FAILED"
+                      ? "Une erreur est survenue lors de l'analyse. Veuillez réessayer en téléversant une nouvelle version du rapport."
+                      : "L'analyse IA est en cours de traitement. Les résultats apparaîtront ici automatiquement dès que l'analyse sera terminée."}
                   </p>
-                  <p className="text-sm text-neutral-400 font-body mt-1">Statut : {analysis?.status ?? "En attente"}</p>
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-100 border border-neutral-200">
+                      {analysis?.status !== "FAILED" && (
+                        <span className="w-2 h-2 rounded-full bg-ai-500 animate-pulse" />
+                      )}
+                      <span className="text-xs font-medium text-neutral-600 font-body">
+                        Statut : {analysis?.status === "PROCESSING" ? "En cours de traitement" : analysis?.status === "FAILED" ? "Échoué" : analysis?.status ?? "En attente"}
+                      </span>
+                    </div>
+                    {reportId && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleReanalyze}
+                        disabled={isRetrying}
+                        icon={<IconSparkles size={14} />}
+                      >
+                        {isRetrying ? "Relance en cours…" : "Relancer l'analyse maintenant"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )
             )}

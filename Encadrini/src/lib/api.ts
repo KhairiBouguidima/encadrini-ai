@@ -730,8 +730,9 @@ export const api = {
   getEvaluationPdfUrl(reportId: string, versionNumber: number) {
     return `${API_BASE_URL}/evaluations/reports/${reportId}/version/${versionNumber}/pdf`
   },
-  getAIAnalysis(reportId: string, versionNumber: number) {
-    return request<AIAnalysisResponse>(`/ai/reports/${reportId}/version/${versionNumber}`)
+  getAIAnalysis(reportId: string, versionNumber: number, force = false) {
+    const q = force ? "?force=true" : ""
+    return request<AIAnalysisResponse>(`/ai/reports/${reportId}/version/${versionNumber}${q}`)
   },
   getAdminStats() {
     return request<PlatformStats>("/admin/stats")

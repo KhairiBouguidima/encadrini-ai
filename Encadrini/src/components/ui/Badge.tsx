@@ -5,6 +5,7 @@ export type BadgeVariant =
   | "rejected"
   | "draft"
   | "reviewing"
+  | "failed"
 
 const badgeConfig: Record<
   BadgeVariant,
@@ -15,7 +16,8 @@ const badgeConfig: Record<
   analysed: { label: "Analysé par IA", bg: "bg-ai-100", text: "text-[#4c1d95]", dot: "bg-ai-600" },
   rejected: { label: "Refusée", bg: "bg-danger-100", text: "text-[#7f1d1d]", dot: "bg-danger-600" },
   draft: { label: "Brouillon", bg: "bg-neutral-100", text: "text-neutral-600", dot: "bg-neutral-400" },
-  reviewing: { label: "En révision", bg: "bg-info-100", text: "text-[#1e3a5f]", dot: "bg-info-600" },
+  reviewing: { label: "En cours d'analyse", bg: "bg-info-100", text: "text-[#1e3a5f]", dot: "bg-info-600" },
+  failed: { label: "Analyse échouée", bg: "bg-danger-100", text: "text-[#7f1d1d]", dot: "bg-danger-600" },
 }
 
 export function StatusBadge({ variant }: { variant: BadgeVariant }) {

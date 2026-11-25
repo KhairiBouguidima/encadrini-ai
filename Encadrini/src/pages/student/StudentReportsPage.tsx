@@ -30,7 +30,7 @@ function getReportTypeBadge(type: string) {
 function statusToBadge(status?: string): BadgeVariant {
   if (status === "COMPLETED") return "analysed"
   if (status === "PROCESSING") return "reviewing"
-  if (status === "FAILED") return "rejected"
+  if (status === "FAILED") return "failed"
   return "pending"
 }
 
